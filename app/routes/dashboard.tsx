@@ -98,7 +98,7 @@ function DashboardShell() {
 	return (
 		<SidebarProvider className="min-h-screen">
 			<Sidebar>
-				<SidebarHeader>
+				<SidebarHeader className="px-4 py-4 sm:px-6">
 					<BrandBlock />
 				</SidebarHeader>
 				<SidebarContent>
@@ -144,11 +144,9 @@ function BrandBlock() {
 	const { isCollapsed, isMobile } = useSidebar();
 
 	return (
-		<div className="rounded-2xl border border-sidebar-border bg-sidebar-accent px-3 py-3 text-sidebar-accent-foreground">
-			<p className="truncate text-sm font-semibold tracking-tight">
-				{isCollapsed && !isMobile ? "BD" : "Bubbly Dragon"}
-			</p>
-		</div>
+		<p className="truncate text-sm font-semibold tracking-tight text-sidebar-accent-foreground">
+			{isCollapsed && !isMobile ? "BD" : "Bubbly Dragon"}
+		</p>
 	);
 }
 
@@ -172,7 +170,6 @@ function SessionFooter({
 					<p className="text-xs text-muted-foreground">Authenticated session</p>
 				</div>
 			</div>
-			<ThemeToggle className="mt-3" />
 			<Button
 				className="mt-3 w-full justify-start"
 				onClick={onSignOut}
@@ -198,7 +195,7 @@ function DashboardSidebarFooter({
 		return (
 			<SidebarFooter className="p-0">
 				<ThemeToggle
-					className="m-0 h-16 w-full rounded-none border-b border-sidebar-border"
+					className="m-0 h-16 w-full rounded-none border-b border-border-70"
 					size="icon"
 					variant="ghost"
 				/>
@@ -216,7 +213,8 @@ function DashboardSidebarFooter({
 	}
 
 	return (
-		<SidebarFooter>
+		<SidebarFooter className="gap-4 flex flex-col">
+			<ThemeToggle />
 			<SessionFooter email={email} onSignOut={onSignOut} />
 		</SidebarFooter>
 	);

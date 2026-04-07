@@ -53,6 +53,15 @@ import { AspectRatio } from "~/components/ui/aspect-ratio";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import {
+	Banner,
+	BannerActions,
+	BannerClose,
+	BannerDescription,
+	BannerTitle,
+	Banners,
+	useBanners,
+} from "~/components/ui/banner";
+import {
 	Breadcrumb,
 	BreadcrumbEllipsis,
 	BreadcrumbItem,
@@ -329,6 +338,17 @@ import {
 } from "~/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
+import {
+	Timeline,
+	TimelineConnector,
+	TimelineContent,
+	TimelineDescription,
+	TimelineDot,
+	TimelineHeader,
+	TimelineItem,
+	TimelineTime,
+	TimelineTitle,
+} from "~/components/ui/timeline";
 import { Toggle } from "~/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import {
@@ -337,6 +357,23 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
+import {
+	Tour,
+	TourArrow,
+	TourClose,
+	TourDescription,
+	TourFooter,
+	TourHeader,
+	TourNext,
+	TourPortal,
+	TourPrev,
+	TourSkip,
+	TourSpotlight,
+	TourSpotlightRing,
+	TourStep,
+	TourStepCounter,
+	TourTitle,
+} from "~/components/ui/tour";
 
 export const Route = createFileRoute("/dashboard/design-system")({
 	component: DesignSystemPage,
@@ -440,6 +477,9 @@ function DesignSystemPage() {
 				<DiceDataShowcase />
 				<DiceInteractionShowcase />
 				<DiceMediaShowcase />
+				<BannerShowcase />
+				<TimelineShowcase />
+				<TourShowcase />
 				<SidebarShowcase />
 				<TypographyShowcase />
 			</div>
@@ -1736,6 +1776,289 @@ function DiceMediaShowcase() {
 					</MediaPlayerControls>
 				</MediaPlayer>
 			</div>
+		</ShowcaseCard>
+	);
+}
+
+function BannerShowcase() {
+	return (
+		<ShowcaseCard
+			className="border-border/70"
+			description="Dice UI banner stack for persistent notices and transient top-of-screen alerts."
+			title="Banner"
+		>
+			<div className="space-y-4">
+				<Banners maxVisible={2}>
+					<BannerShowcaseControls />
+				</Banners>
+				<div className="rounded-2xl border border-dashed border-border/70 p-4">
+					<Banner
+						className="rounded-xl border border-border/70"
+						variant="success"
+					>
+						<Check className="size-4 shrink-0" />
+						<div className="min-w-0 flex-1">
+							<BannerTitle>Success variant</BannerTitle>
+							<BannerDescription>
+								Banner content can also be mounted inline for static previews.
+							</BannerDescription>
+						</div>
+					</Banner>
+				</div>
+			</div>
+		</ShowcaseCard>
+	);
+}
+
+function BannerShowcaseControls() {
+	const { onBannerAdd, onBannersClear } = useBanners();
+
+	return (
+		<div className="space-y-4">
+			<p className="text-sm text-muted-foreground">
+				Use banners for deployment, compliance, or billing notices that should
+				hold the full width of the viewport.
+			</p>
+			<div className="flex flex-wrap gap-3">
+				<Button
+					onClick={() =>
+						onBannerAdd({
+							variant: "info",
+							duration: 4500,
+							content: (
+								<>
+									<CircleAlert className="size-4 shrink-0" />
+									<div className="min-w-0 flex-1">
+										<BannerTitle>Deployment notice</BannerTitle>
+										<BannerDescription>
+											Wrangler secrets and Convex env values should be updated
+											together before shipping.
+										</BannerDescription>
+									</div>
+									<BannerActions>
+										<Button size="sm" variant="secondary">
+											Inspect
+										</Button>
+										<BannerClose />
+									</BannerActions>
+								</>
+							),
+						})
+					}
+					variant="outline"
+				>
+					Info banner
+				</Button>
+				<Button
+					onClick={() =>
+						onBannerAdd({
+							variant: "warning",
+							content: (
+								<>
+									<CircleAlert className="size-4 shrink-0" />
+									<div className="min-w-0 flex-1">
+										<BannerTitle>Schema change pending</BannerTitle>
+										<BannerDescription>
+											Run the migration helper before narrowing or deleting live
+											fields.
+										</BannerDescription>
+									</div>
+									<BannerClose />
+								</>
+							),
+						})
+					}
+				>
+					Warning banner
+				</Button>
+				<Button onClick={onBannersClear} variant="ghost">
+					Clear banners
+				</Button>
+			</div>
+		</div>
+	);
+}
+
+function TimelineShowcase() {
+	return (
+		<ShowcaseCard
+			className="border-border/70"
+			description="Dice UI timeline for changelogs, onboarding history, and rollout milestones."
+			title="Timeline"
+		>
+			<Timeline activeIndex={1}>
+				<TimelineItem>
+					<TimelineDot />
+					<TimelineConnector />
+					<TimelineContent>
+						<TimelineHeader>
+							<TimelineTime dateTime="2026-04-01">April 1</TimelineTime>
+							<TimelineTitle>Bootstrap the workspace</TimelineTitle>
+							<TimelineDescription>
+								Provision Convex, sync Wrangler secrets, and verify auth before
+								building product features.
+							</TimelineDescription>
+						</TimelineHeader>
+					</TimelineContent>
+				</TimelineItem>
+				<TimelineItem>
+					<TimelineDot />
+					<TimelineConnector />
+					<TimelineContent>
+						<TimelineHeader>
+							<TimelineTime dateTime="2026-04-04">April 4</TimelineTime>
+							<TimelineTitle>Design system expansion</TimelineTitle>
+							<TimelineDescription>
+								Add the shared shadcn and Dice UI primitives, then render them
+								in a single authenticated showcase route.
+							</TimelineDescription>
+						</TimelineHeader>
+					</TimelineContent>
+				</TimelineItem>
+				<TimelineItem>
+					<TimelineDot />
+					<TimelineContent>
+						<TimelineHeader>
+							<TimelineTime dateTime="2026-04-07">April 7</TimelineTime>
+							<TimelineTitle>Ship user-facing flows</TimelineTitle>
+							<TimelineDescription>
+								Move from primitives to actual product surfaces once the
+								template boundaries are stable.
+							</TimelineDescription>
+						</TimelineHeader>
+					</TimelineContent>
+				</TimelineItem>
+			</Timeline>
+		</ShowcaseCard>
+	);
+}
+
+function TourShowcase() {
+	const [isOpen, setIsOpen] = useState(false);
+	const [step, setStep] = useState(0);
+
+	return (
+		<ShowcaseCard
+			className="border-border/70"
+			description="Dice UI tour for guided walkthroughs with spotlight, step state, and keyboard-safe focus management."
+			title="Tour"
+		>
+			<div className="space-y-4">
+				<div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 p-4">
+					<div>
+						<p className="font-medium">Operator onboarding tour</p>
+						<p className="text-sm text-muted-foreground">
+							Start a three-step walkthrough anchored to real targets.
+						</p>
+					</div>
+					<Button
+						onClick={() => {
+							setStep(0);
+							setIsOpen(true);
+						}}
+					>
+						Start tour
+					</Button>
+				</div>
+				<div className="grid gap-3 sm:grid-cols-3">
+					<Card className="border-border/70 shadow-none" id="tour-target-model">
+						<CardHeader>
+							<CardTitle className="text-base">Model</CardTitle>
+							<CardDescription>
+								Define ownership and indexes before you write queries.
+							</CardDescription>
+						</CardHeader>
+					</Card>
+					<Card
+						className="border-border/70 shadow-none"
+						id="tour-target-compose"
+					>
+						<CardHeader>
+							<CardTitle className="text-base">Compose</CardTitle>
+							<CardDescription>
+								Build with shared primitives instead of one-off UI.
+							</CardDescription>
+						</CardHeader>
+					</Card>
+					<Card className="border-border/70 shadow-none" id="tour-target-ship">
+						<CardHeader>
+							<CardTitle className="text-base">Ship</CardTitle>
+							<CardDescription>
+								Run lint, typecheck, build, then deploy through Wrangler.
+							</CardDescription>
+						</CardHeader>
+					</Card>
+				</div>
+			</div>
+			<Tour
+				onOpenChange={setIsOpen}
+				onValueChange={setStep}
+				open={isOpen}
+				value={step}
+			>
+				<TourPortal>
+					<TourSpotlight />
+					<TourSpotlightRing className="rounded-3xl" />
+					<TourStep target="#tour-target-model">
+						<TourArrow />
+						<TourClose className="absolute top-3 right-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground" />
+						<TourHeader>
+							<TourTitle>Start with the data model</TourTitle>
+							<TourDescription>
+								Convex code quality is downstream of table design. Decide
+								ownership, relations, and indexes before touching the UI.
+							</TourDescription>
+						</TourHeader>
+						<TourFooter className="items-center justify-between">
+							<TourStepCounter />
+							<div className="flex gap-2">
+								<TourSkip />
+								<TourPrev />
+								<TourNext />
+							</div>
+						</TourFooter>
+					</TourStep>
+					<TourStep target="#tour-target-compose">
+						<TourArrow />
+						<TourClose className="absolute top-3 right-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground" />
+						<TourHeader>
+							<TourTitle>Compose from the system</TourTitle>
+							<TourDescription>
+								Reach for shared primitives first. New UI should inherit tokens,
+								interaction patterns, and accessibility defaults.
+							</TourDescription>
+						</TourHeader>
+						<TourFooter className="items-center justify-between">
+							<TourStepCounter />
+							<div className="flex gap-2">
+								<TourSkip />
+								<TourPrev />
+								<TourNext />
+							</div>
+						</TourFooter>
+					</TourStep>
+					<TourStep target="#tour-target-ship">
+						<TourArrow />
+						<TourClose className="absolute top-3 right-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground" />
+						<TourHeader>
+							<TourTitle>Ship through the verified path</TourTitle>
+							<TourDescription>
+								Local checks come first. Deployment happens through the
+								generated Wrangler worker config, with secrets managed by the
+								CLI.
+							</TourDescription>
+						</TourHeader>
+						<TourFooter className="items-center justify-between">
+							<TourStepCounter />
+							<div className="flex gap-2">
+								<TourSkip />
+								<TourPrev />
+								<TourNext />
+							</div>
+						</TourFooter>
+					</TourStep>
+				</TourPortal>
+			</Tour>
 		</ShowcaseCard>
 	);
 }

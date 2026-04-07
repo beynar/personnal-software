@@ -29,6 +29,7 @@ Current local primitives in `app/components/ui/`:
 - `aspect-ratio`
 - `avatar`
 - `badge`
+- `banner`
 - `breadcrumb`
 - `button`
 - `button-group`
@@ -46,17 +47,21 @@ Current local primitives in `app/components/ui/`:
 - `dropdown-menu`
 - `empty`
 - `field`
+- `file-upload`
 - `hover-card`
 - `input`
 - `input-group`
 - `input-otp`
 - `item`
+- `kanban`
 - `kbd`
 - `label`
+- `media-player`
 - `menubar`
 - `native-select`
 - `navigation-menu`
 - `pagination`
+- `phone-input`
 - `popover`
 - `progress`
 - `radio-group`
@@ -69,21 +74,30 @@ Current local primitives in `app/components/ui/`:
 - `skeleton`
 - `slider`
 - `sonner`
+- `sortable`
 - `spinner`
+- `stat`
 - `switch`
 - `table`
 - `tabs`
 - `textarea`
+- `timeline`
 - `toggle`
 - `toggle-group`
 - `tooltip`
+- `tour`
 
 Before adding a new primitive, check whether one of the above already solves the problem.
 
-Docs patterns that should be composed on top of the primitives above:
+Related compound pieces that also exist in this repo:
+
+- `app/components/data-table/data-table.tsx`
+- `app/components/data-table/data-table-pagination.tsx`
+
+Docs patterns or higher-level compositions that should be built on top of the primitives above:
 
 - `combobox` via `Popover + Command`
-- `data-table` via `Table + Input + Badge + Pagination`
+- `data-table` via the local `app/components/data-table/*` helpers plus `Table`
 - `date-picker` via `Popover + Button + Calendar`
 - `typography` via semantic HTML plus the token-aware utility scale
 
