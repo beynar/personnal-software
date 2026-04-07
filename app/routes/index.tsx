@@ -1,6 +1,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
-import { createFileRoute } from "@tanstack/react-router";
-import { type FormEvent, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Authenticated } from "convex/react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
 	Card,
@@ -17,9 +18,20 @@ export const Route = createFileRoute("/")({
 	component: HomePage,
 });
 
+function RedirectToDashboard() {
+	const navigate = useNavigate();
+	useEffect(() => {
+		navigate({ to: "/dashboard" });
+	}, [navigate]);
+	return null;
+}
+
 function HomePage() {
 	return (
 		<div className="flex min-h-screen items-center justify-center px-4">
+			<Authenticated>
+				<RedirectToDashboard />
+			</Authenticated>
 			<Card className="w-full max-w-sm">
 				<CardHeader className="text-center">
 					<CardTitle className="text-2xl">Bubbly Dragon</CardTitle>
