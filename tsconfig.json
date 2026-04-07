@@ -16,5 +16,5 @@
       "~/*": ["./app/*"]
     }
   },
-  "include": ["app/**/*.ts", "app/**/*.tsx", "vite.config.ts"]
+  "include": ["app/**/*.ts", "app/**/*.tsx", "convex/**/*.ts", "vite.config.ts"]
 }
