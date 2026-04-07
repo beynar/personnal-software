@@ -69,6 +69,12 @@ function RootDocument({ children }: { children: ReactNode }) {
 		<html lang="en">
 			<head>
 				<HeadContent />
+				<script>{`(() => {
+  const savedTheme = window.localStorage.getItem("theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const theme = savedTheme === "light" || savedTheme === "dark" ? savedTheme : prefersDark ? "dark" : "light";
+  document.documentElement.classList.toggle("dark", theme === "dark");
+})();`}</script>
 			</head>
 			<body className="min-h-screen antialiased">
 				{children}
