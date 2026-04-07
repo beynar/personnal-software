@@ -15,6 +15,12 @@ const schema = defineSchema({
 	})
 		.index("email", ["email"])
 		.index("phone", ["phone"]),
+	// Shared counter — demonstrates Convex real-time subscriptions.
+	// A single document per counter name holds the current value.
+	counters: defineTable({
+		name: v.string(),
+		value: v.number(),
+	}).index("by_name", ["name"]),
 	// File storage metadata — tracks uploaded files with owner reference
 	files: defineTable({
 		storageId: v.id("_storage"),
