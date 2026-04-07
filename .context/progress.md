@@ -10,6 +10,11 @@
 - **Tailwind v4**: Uses `@import "tailwindcss"` in CSS, no `tailwind.config.js` needed. Import CSS via `?url` suffix in root route head links.
 - **Path alias `~` → `app/`**: Defined in both `tsconfig.json` (`paths`) and `vite.config.ts` (`resolve.alias`). Both must be kept in sync. Vite uses `fileURLToPath(new URL("./app", import.meta.url))`.
 - **shadcn/ui setup (manual)**: Components in `app/components/ui/`, cn helper in `app/lib/utils.ts`, config in `components.json`. Radix UI primitives installed per-component. Tailwind v4 theming uses `@theme inline` block + CSS variables in `:root`.
+- **Convex queries without `_generated`**: Use `anyApi` from `convex/server` with `FunctionReference` type annotation to reference Convex functions without needing the generated API (e.g., `const viewerQuery: FunctionReference<"query"> = anyApi.users.viewer`). Use `queryGeneric` from `convex/server` for server-side query definitions.
+- **Auth guards**: Use `<Authenticated>` and `<Unauthenticated>` components from `convex/react` for reactive auth-based rendering. Combine with `useNavigate()` + `useEffect` for redirects.
+- **Convex file storage pattern**: 3-step upload: `generateUploadUrl` → `fetch(url, {method:"POST", body:file})` → `saveFile` mutation. Use `ctx.storage.generateUploadUrl()`, `ctx.storage.delete()`, `ctx.storage.getUrl()` for blob operations. Track metadata in a custom table with `v.id("_storage")` reference.
+- **TanStack Router flat routes**: Use dot notation for nested paths: `examples.file-upload.tsx` → `/examples/file-upload`. No need for directory structure or layout routes.
+- **Convex generic ctx type casting**: When using `mutationGeneric`/`queryGeneric`, cast `ctx.db` methods with a typed alias (`type AnyFn = (...args: any[]) => any`) to avoid Biome's `noBannedTypes` rule rejecting `Function`. Add a single `biome-ignore` comment for the type alias.
 
 ## US-001: Scaffold TanStack Start app with Cloudflare deployment
 - Created full TanStack Start scaffold with Vite 7 + Cloudflare Workers deployment
@@ -65,3 +70,40 @@
   - `import.meta.dirname` not available without `@types/node` — use `fileURLToPath(new URL("./app", import.meta.url))` instead
   - Convex auth Password provider uses `flow: "signIn"` / `flow: "signUp"` hidden fields in FormData to distinguish login vs registration
   - `useAuthActions()` from `@convex-dev/auth/react` provides `signIn(provider, params)` — provider is `"password"` for email/password
+
+## US-004: Add authenticated dashboard route with session guard
+- Created `convex/users.ts` with `viewer` query that returns the current user document (or null if unauthenticated) using `auth.getUserId(ctx)`
+- Created `app/routes/dashboard.tsx` with protected dashboard route using `<Authenticated>` / `<Unauthenticated>` components from `convex/react`
+- Dashboard shows user email in header and main content, plus Sign Out button
+- Unauthenticated users on `/dashboard` are redirected to `/` (login page)
+- Updated `app/routes/index.tsx` to redirect authenticated users to `/dashboard` using `<Authenticated>` wrapper
+- Sign Out calls `useAuthActions().signOut()` then navigates to `/`
+- Auth state is reactive via Convex's `<Authenticated>`/`<Unauthenticated>` components and `useQuery`
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - `convex/_generated` directory doesn't exist without running `npx convex dev` — avoid importing from it
+  - Use `anyApi` from `convex/server` to reference Convex functions without generated types: `const ref: FunctionReference<"query"> = anyApi.module.func`
+  - Use `queryGeneric` from `convex/server` instead of `query` from `_generated/server` for defining queries without generated types
+  - `GenericQueryCtx<Record<string, never>>` is the typed alternative to `any` for generic Convex query context
+  - Biome's `noExplicitAny` rule catches `any` annotations in Convex handlers — must use proper generic types
+
+## US-005: Add Convex file upload example pattern
+- Created `convex/files.ts` with 4 functions: `generateUploadUrl` (mutation), `saveFile` (mutation), `deleteFile` (mutation), `listFiles` (query)
+- Added `files` table to `convex/schema.ts` with storageId, name, size, type, uploadedAt, userId fields and `by_user` index
+- Created `app/routes/examples.file-upload.tsx` with complete upload UI:
+  - File picker with styled input
+  - Upload progress bar using XMLHttpRequest for progress tracking
+  - Real-time file list via Convex subscription (`useQuery`)
+  - Each file shows name, size, upload date, and download link
+  - Delete button per file with loading state
+  - Auth guard with redirect to login
+- Files changed: `convex/schema.ts`, `convex/files.ts` (new), `app/routes/examples.file-upload.tsx` (new), `app/routeTree.gen.ts` (auto-generated)
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - Convex file upload is a 3-step process: generateUploadUrl → POST file to URL → saveFile mutation with storageId
+  - XMLHttpRequest is needed for upload progress (fetch API doesn't support upload progress)
+  - `ctx.storage.getUrl(storageId)` returns a download URL for stored files
+  - `v.id("_storage")` is the Convex validator for storage blob references
+  - Biome rejects bare `Function` type — use a typed alias with `biome-ignore` comment
+  - TanStack Router flat route convention: `examples.file-upload.tsx` → `/examples/file-upload`
+  - Route tree auto-regenerates on `vite build`, resolving `FileRoutesByPath` type errors for new routes

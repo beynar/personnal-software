@@ -15,6 +15,15 @@ const schema = defineSchema({
 	})
 		.index("email", ["email"])
 		.index("phone", ["phone"]),
+	// File storage metadata — tracks uploaded files with owner reference
+	files: defineTable({
+		storageId: v.id("_storage"),
+		name: v.string(),
+		size: v.number(),
+		type: v.string(),
+		uploadedAt: v.number(),
+		userId: v.id("users"),
+	}).index("by_user", ["userId"]),
 });
 
 export default schema;
