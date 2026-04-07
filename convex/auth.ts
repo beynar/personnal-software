@@ -1,60 +1,89 @@
-import { Password } from "@convex-dev/auth/providers/Password";
-import { convexAuth } from "@convex-dev/auth/server";
+import {
+	type AuthFunctions,
+	type GenericCtx,
+	createClient,
+} from "@convex-dev/better-auth";
+import { convex } from "@convex-dev/better-auth/plugins";
+import { type BetterAuthOptions, betterAuth } from "better-auth/minimal";
+import { components, internal } from "./_generated/api";
+import type { DataModel, Id } from "./_generated/dataModel";
+import { query } from "./_generated/server";
+import authConfig from "./auth.config";
+import betterAuthSchema from "./betterAuth/schema";
 
-export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-	providers: [
-		Password({
-			profile(params) {
-				const email = normalizeEmail(params.email);
-				const name =
-					params.flow === "signUp"
-						? normalizeRequiredName(params.name)
-						: undefined;
+const siteUrl = process.env.SITE_URL ?? "http://localhost:8888";
 
-				if (params.flow === "signUp") {
-					const expectedPassword = process.env.SUPER_ADMIN_SIGNUP_PASSWORD;
-					if (!expectedPassword) {
-						throw new Error(
-							"Missing SUPER_ADMIN_SIGNUP_PASSWORD environment variable",
-						);
+// biome-ignore lint/suspicious/noExplicitAny: AuthFunctions type resolved after npx convex dev
+const authFunctions: AuthFunctions = internal.auth as any;
+
+// The component client provides methods for integrating Convex with Better Auth,
+// plus helper methods for getting authenticated users.
+// biome-ignore lint/suspicious/noExplicitAny: component types resolved after npx convex dev
+const betterAuthRef = (components as any).betterAuth;
+export const authComponent = createClient<DataModel, typeof betterAuthSchema>(
+	betterAuthRef,
+	{
+		authFunctions,
+		local: {
+			schema: betterAuthSchema,
+		},
+		triggers: {
+			user: {
+				onCreate: async (ctx, authUser) => {
+					const userId = await ctx.db.insert("users", {
+						email: authUser.email,
+					});
+					await authComponent.setUserId(
+						ctx,
+						authUser._id,
+						userId as unknown as string,
+					);
+				},
+				onUpdate: async (ctx, newUser, oldUser) => {
+					if (oldUser.email === newUser.email) return;
+					await ctx.db.patch(newUser.userId as unknown as Id<"users">, {
+						email: newUser.email,
+					});
+				},
+				onDelete: async (ctx, authUser) => {
+					if (!authUser.userId) return;
+					const user = await ctx.db.get(
+						authUser.userId as unknown as Id<"users">,
+					);
+					if (user) {
+						await ctx.db.delete(user._id);
 					}
-
-					if (params.superAdminPassword !== expectedPassword) {
-						throw new Error("Invalid super admin password");
-					}
-				}
-
-				return {
-					email,
-					...(name ? { name } : {}),
-				};
+				},
 			},
-		}),
-	],
+		},
+	},
+);
+
+// Trigger API exports — required by the component for lifecycle hooks
+export const { onCreate, onUpdate, onDelete } = authComponent.triggersApi();
+// Client API exports — required by the component for auth queries
+export const { getAuthUser } = authComponent.clientApi();
+
+// Better Auth options factory (used by adapter and schema generation)
+export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
+	({
+		baseURL: siteUrl,
+		database: authComponent.adapter(ctx),
+		emailAndPassword: {
+			enabled: true,
+			requireEmailVerification: false,
+		},
+		plugins: [convex({ authConfig })],
+	}) satisfies BetterAuthOptions;
+
+// Better Auth instance factory (used by HTTP routes and server-side auth calls)
+export const createAuth = (ctx: GenericCtx<DataModel>) =>
+	betterAuth(createAuthOptions(ctx));
+
+// Returns the authenticated app user, or null if not authenticated.
+export const getCurrentUser = query({
+	args: {},
+	handler: async (ctx) => {
+		return await authComponent.safeGetAuthUser(ctx);
+	},
 });
-
-function normalizeEmail(value: unknown) {
-	if (typeof value !== "string") {
-		throw new Error("Missing `email` param");
-	}
-
-	const email = value.trim().toLowerCase();
-	if (!email) {
-		throw new Error("Missing `email` param");
-	}
-
-	return email;
-}
-
-function normalizeRequiredName(value: unknown) {
-	if (typeof value !== "string") {
-		throw new Error("Missing `name` param");
-	}
-
-	const name = value.trim();
-	if (!name) {
-		throw new Error("Missing `name` param");
-	}
-
-	return name.slice(0, 80);
-}

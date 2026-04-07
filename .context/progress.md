@@ -1,5 +1,8 @@
 ## Codebase Patterns
 
+- **Better Auth local component install**: `convex/betterAuth/` is a Convex component directory with `convex.config.ts` (defineComponent), `schema.ts` (generated tables), `auth.ts` (static instance for CLI), `adapter.ts` (createApi). Register in app's `convex/convex.config.ts` via `app.use(betterAuth)`.
+- **Better Auth user model**: Auth component has its own `user` table with `userId` field linking to app's `users` table. Use `authComponent.safeGetAuthUser(ctx)` to get the auth user, then `ctx.db.get(authUser.userId)` for the app user. Triggers sync email between auth user and app user.
+- **Better Auth type bootstrapping**: `components.betterAuth` and `internal.auth` types only resolve after `npx convex dev`. Use `as any` casts with biome-ignore comments during scaffold phase; types become correct once Convex generates them.
 - **TanStack Start v1.167+ uses Vite directly** — no vinxi, no app.config.ts. Config goes in `vite.config.ts` with `tanstackStart()` plugin from `@tanstack/react-start/plugin/vite`.
 - **srcDirectory defaults to `"src"`** — must set `srcDirectory: "app"` in tanstackStart() options to use `app/` directory.
 - **Router entry must export `getRouter()`** — not `createRouter`. The plugin resolves `router.tsx` in srcDirectory and expects this named export.
@@ -150,3 +153,30 @@
 - **Learnings for future iterations:**
   - README was straightforward since all context was available from prior US progress notes
   - Project uses `npm run deploy` which maps to `wrangler deploy` — no separate build step needed in the script since vite build is implicit
+
+## US-001: Scaffold Better Auth local install in Convex
+- Installed `@convex-dev/better-auth@0.11.4`, `better-auth@1.5.3`, `@better-auth/api-key@1.5.3`
+- Created `convex/betterAuth/convex.config.ts` with `defineComponent("betterAuth")`
+- Created `convex/betterAuth/schema.ts` with generated tables: user, session, account, verification, jwks
+- Created `convex/betterAuth/auth.ts` with static auth instance for Better Auth CLI schema generation
+- Created `convex/betterAuth/adapter.ts` with `createApi(schema, createAuthOptions)` exporting CRUD functions
+- Rewrote `convex/auth.config.ts` to use `getAuthConfigProvider()` from `@convex-dev/better-auth/auth-config`
+- Updated `convex/convex.config.ts` to import and register local betterAuth component via `app.use(betterAuth)`
+- Rewrote `convex/auth.ts` with `createClient`, `createAuth`, `createAuthOptions`, trigger APIs (`onCreate/onUpdate/onDelete`), and `getCurrentUser` query
+- Updated `convex/http.ts` to use `authComponent.registerRoutes(http, createAuth)`
+- Updated `convex/schema.ts` — removed `authTables` from `@convex-dev/auth/server`; kept users (with email sync), counters, files tables
+- Updated `convex/users.ts` and `convex/files.ts` to use `authComponent.safeGetAuthUser(ctx)` instead of `auth.getUserId(ctx)`
+- Updated `vite.config.ts` with `ssr.noExternal: ["@convex-dev/better-auth"]`
+- Updated `biome.json` to ignore `convex/betterAuth/_generated/**`
+- `@convex-dev/auth` kept in package.json temporarily — frontend still imports `ConvexAuthProvider` and `useAuthActions` from it; frontend migration is a separate story
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - `@better-auth/api-key@1.5.3` must match `better-auth@1.5.3` — later versions require `better-auth@^1.6.0`
+  - `createClient<DataModel, typeof betterAuthSchema>()` takes both app DataModel and component schema type args for full typing
+  - `authComponent.safeGetAuthUser(ctx)` returns `{ _id, email, userId, ... }` where `userId` links to the app's users table (set via triggers)
+  - User lifecycle triggers (`onCreate/onUpdate/onDelete`) handle syncing between betterAuth's internal user table and the app's users table
+  - `createAuthOptions` must be a separate export from `createAuth` — the adapter needs options without creating a full auth instance
+  - `betterAuth` from `better-auth/minimal` is the correct import for Convex (not `better-auth` main) — minimal build avoids pulling in Node.js-only deps
+  - Biome-ignore comments must be directly above the line containing the violation — not separated by other code lines
+  - `components` from `_generated/api` is `{}` until `npx convex dev` regenerates with the component registered; use `as any` cast
+  - `ssr.noExternal: ["@convex-dev/better-auth"]` in vite.config.ts is required for TanStack Start SSR to bundle the package correctly

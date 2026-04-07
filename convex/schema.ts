@@ -1,9 +1,9 @@
-import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 const schema = defineSchema({
-	...authTables,
+	// App users — synced from Better Auth component via user triggers.
+	// Additional profile fields can be added here freely.
 	users: defineTable({
 		name: v.optional(v.string()),
 		username: v.optional(v.string()),
@@ -11,16 +11,10 @@ const schema = defineSchema({
 		image: v.optional(v.string()),
 		imageStorageId: v.optional(v.id("_storage")),
 		email: v.optional(v.string()),
-		emailVerificationTime: v.optional(v.number()),
-		phone: v.optional(v.string()),
-		phoneVerificationTime: v.optional(v.number()),
-		isAnonymous: v.optional(v.boolean()),
 	})
 		.index("email", ["email"])
-		.index("by_username", ["username"])
-		.index("phone", ["phone"]),
+		.index("by_username", ["username"]),
 	// Shared counter — demonstrates Convex real-time subscriptions.
-	// A single document per counter name holds the current value.
 	counters: defineTable({
 		name: v.string(),
 		value: v.number(),

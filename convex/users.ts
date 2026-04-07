@@ -1,6 +1,7 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { auth } from "./auth";
+import { authComponent } from "./auth";
 
 /**
  * Returns the authenticated user document for dashboard surfaces.
@@ -8,23 +9,17 @@ import { auth } from "./auth";
 export const viewer = query({
 	args: {},
 	handler: async (ctx) => {
-		const userId = await auth.getUserId(ctx);
-		if (!userId) {
-			return null;
-		}
-		const user = await ctx.db.get(userId);
-		if (!user) {
-			return null;
-		}
+		const authUser = await authComponent.safeGetAuthUser(ctx);
+		if (!authUser?.userId) return null;
+
+		const user = await ctx.db.get(authUser.userId as unknown as Id<"users">);
+		if (!user) return null;
 
 		const image = user.imageStorageId
 			? await ctx.storage.getUrl(user.imageStorageId)
 			: user.image;
 
-		return {
-			...user,
-			image,
-		};
+		return { ...user, image };
 	},
 });
 
@@ -39,11 +34,10 @@ export const updateProfile = mutation({
 		bio: v.string(),
 	},
 	handler: async (ctx, args) => {
-		const userId = await auth.getUserId(ctx);
-		if (!userId) {
-			throw new Error("Not authenticated");
-		}
+		const authUser = await authComponent.safeGetAuthUser(ctx);
+		if (!authUser?.userId) throw new Error("Not authenticated");
 
+		const userId = authUser.userId as unknown as Id<"users">;
 		const name = normalizeOptionalValue(args.name, 80);
 		const username = normalizeUsername(args.username);
 		const bio = normalizeOptionalValue(args.bio, 280);
@@ -60,7 +54,6 @@ export const updateProfile = mutation({
 		}
 
 		await ctx.db.patch(userId, { bio, name, username });
-
 		return null;
 	},
 });
@@ -73,15 +66,12 @@ export const updateProfileImage = mutation({
 		storageId: v.union(v.id("_storage"), v.null()),
 	},
 	handler: async (ctx, args) => {
-		const userId = await auth.getUserId(ctx);
-		if (!userId) {
-			throw new Error("Not authenticated");
-		}
+		const authUser = await authComponent.safeGetAuthUser(ctx);
+		if (!authUser?.userId) throw new Error("Not authenticated");
 
+		const userId = authUser.userId as unknown as Id<"users">;
 		const user = await ctx.db.get(userId);
-		if (!user) {
-			throw new Error("User not found");
-		}
+		if (!user) throw new Error("User not found");
 
 		if (user.imageStorageId && user.imageStorageId !== args.storageId) {
 			await ctx.storage.delete(user.imageStorageId);
@@ -90,7 +80,6 @@ export const updateProfileImage = mutation({
 		await ctx.db.patch(userId, {
 			imageStorageId: args.storageId ?? undefined,
 		});
-
 		return null;
 	},
 });
@@ -102,16 +91,12 @@ function normalizeOptionalValue(value: string, maxLength: number) {
 
 function normalizeUsername(value: string) {
 	const normalizedValue = value.trim().toLowerCase().replaceAll(/\s+/g, "-");
-
-	if (!normalizedValue) {
-		return undefined;
-	}
+	if (!normalizedValue) return undefined;
 
 	if (!/^[a-z0-9_-]{3,32}$/.test(normalizedValue)) {
 		throw new Error(
 			"Username must be 3-32 characters and use letters, numbers, hyphens, or underscores",
 		);
 	}
-
 	return normalizedValue;
 }
