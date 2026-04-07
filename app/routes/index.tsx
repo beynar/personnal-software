@@ -1,7 +1,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Authenticated } from "convex/react";
-import { type FormEvent, useEffect, useState } from "react";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { type FormEvent, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
 	Card,
@@ -13,25 +13,21 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { getAuthSession, syncAuthSession } from "~/lib/auth.functions";
 
 export const Route = createFileRoute("/")({
+	beforeLoad: async () => {
+		const session = await getAuthSession();
+		if (session) {
+			throw redirect({ to: "/dashboard" });
+		}
+	},
 	component: HomePage,
 });
-
-function RedirectToDashboard() {
-	const navigate = useNavigate();
-	useEffect(() => {
-		navigate({ to: "/dashboard" });
-	}, [navigate]);
-	return null;
-}
 
 function HomePage() {
 	return (
 		<div className="flex min-h-screen items-center justify-center px-4">
-			<Authenticated>
-				<RedirectToDashboard />
-			</Authenticated>
 			<Card className="w-full max-w-sm">
 				<CardHeader className="text-center">
 					<CardTitle className="text-2xl">Bubbly Dragon</CardTitle>
@@ -60,6 +56,8 @@ function HomePage() {
 
 function LoginForm() {
 	const { signIn } = useAuthActions();
+	const navigate = useNavigate();
+	const syncSession = useServerFn(syncAuthSession);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
@@ -67,8 +65,15 @@ function LoginForm() {
 		e.preventDefault();
 		setError("");
 		setLoading(true);
+		const formData = new FormData(e.currentTarget);
+		const email = formData.get("email");
 		try {
-			await signIn("password", new FormData(e.currentTarget));
+			await signIn("password", formData);
+			if (typeof email !== "string") {
+				throw new Error("Missing email");
+			}
+			await syncSession({ data: { email } });
+			navigate({ to: "/dashboard" });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to sign in");
 		} finally {
@@ -110,6 +115,8 @@ function LoginForm() {
 
 function SignUpForm() {
 	const { signIn } = useAuthActions();
+	const navigate = useNavigate();
+	const syncSession = useServerFn(syncAuthSession);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
@@ -127,9 +134,15 @@ function SignUpForm() {
 		}
 
 		formData.delete("confirmPassword");
+		const email = formData.get("email");
 		setLoading(true);
 		try {
 			await signIn("password", formData);
+			if (typeof email !== "string") {
+				throw new Error("Missing email");
+			}
+			await syncSession({ data: { email } });
+			navigate({ to: "/dashboard" });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to create account");
 		} finally {
@@ -167,6 +180,18 @@ function SignUpForm() {
 					name="confirmPassword"
 					type="password"
 					autoComplete="new-password"
+					required
+				/>
+			</div>
+			<div className="space-y-2">
+				<Label htmlFor="signup-super-admin-password">
+					Super Admin Password
+				</Label>
+				<Input
+					id="signup-super-admin-password"
+					name="superAdminPassword"
+					type="password"
+					autoComplete="one-time-code"
 					required
 				/>
 			</div>

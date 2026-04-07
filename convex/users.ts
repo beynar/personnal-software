@@ -1,10 +1,9 @@
-import type { GenericQueryCtx } from "convex/server";
-import { queryGeneric } from "convex/server";
+import { query } from "./_generated/server";
 import { auth } from "./auth";
 
-export const viewer = queryGeneric({
+export const viewer = query({
 	args: {},
-	handler: async (ctx: GenericQueryCtx<Record<string, never>>) => {
+	handler: async (ctx) => {
 		const userId = await auth.getUserId(ctx);
 		if (!userId) {
 			return null;

@@ -5,4 +5,5 @@ dist
 .wrangler
 .env
 .env.local
+.dev.vars
 app/routeTree.gen.ts

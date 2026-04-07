@@ -12,6 +12,7 @@ This app depends on:
 - A Convex deployment
 - Convex Auth environment variables and HTTP routes
 - A local `.env.local` for Vite/TanStack Start
+- A local Worker secret source for TanStack Start route sessions
 - Cloudflare Wrangler for deployment
 - Wrangler-managed secrets/bindings for any deployed Worker
 
@@ -88,6 +89,32 @@ After auth setup, push the backend again:
 npx convex dev --once --typecheck disable
 ```
 
+## 4.1 Configure the signup secret in Convex
+
+Account creation is restricted in `convex/auth.ts`. Set the signup secret on the
+Convex deployment before testing sign up:
+
+```bash
+npx convex env set SUPER_ADMIN_SIGNUP_PASSWORD "choose-a-long-random-secret"
+```
+
+Use the same command against the production deployment before `npx convex deploy`.
+
+## 4.2 Configure the TanStack Start session secret
+
+Route protection now uses an encrypted HTTP-only cookie managed by the Worker
+runtime. For local development, add the secret to `.dev.vars`:
+
+```env
+AUTH_SESSION_SECRET=generate-at-least-32-random-characters
+```
+
+Generate one with:
+
+```bash
+openssl rand -base64 32
+```
+
 ## 5. Start local development
 
 Run the app:
@@ -114,7 +141,7 @@ Before deploying, verify these manually:
 
 1. Open `http://localhost:8888`
 2. Confirm the login/signup UI renders
-3. Create a test account
+3. Create a test account with the super admin password
 4. Confirm you land on `/dashboard`
 5. Visit `/examples/realtime`
 6. Visit `/examples/file-upload`
@@ -210,12 +237,19 @@ Push required values with Wrangler:
 ```bash
 printf '%s' "$VITE_CONVEX_URL" | npx wrangler secret put VITE_CONVEX_URL
 printf '%s' "$VITE_CONVEX_SITE_URL" | npx wrangler secret put VITE_CONVEX_SITE_URL
+printf '%s' "$AUTH_SESSION_SECRET" | npx wrangler secret put AUTH_SESSION_SECRET
 ```
 
 If you use Anthropic features, also set:
 
 ```bash
 printf '%s' "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
+```
+
+Also set the signup secret on the target Convex deployment:
+
+```bash
+npx convex env set SUPER_ADMIN_SIGNUP_PASSWORD "choose-a-long-random-secret"
 ```
 
 Notes:

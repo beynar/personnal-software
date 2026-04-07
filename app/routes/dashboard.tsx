@@ -3,16 +3,12 @@ import {
 	Link,
 	Outlet,
 	createFileRoute,
+	redirect,
 	useLocation,
 	useNavigate,
 } from "@tanstack/react-router";
-import {
-	AuthLoading,
-	Authenticated,
-	Unauthenticated,
-	useQuery,
-} from "convex/react";
-import { type FunctionReference, anyApi } from "convex/server";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "convex/react";
 import { Home, Layers3, LogOut, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -30,68 +26,37 @@ import {
 	useSidebar,
 } from "~/components/ui/sidebar";
 import { Switch } from "~/components/ui/switch";
+import { getAuthSession, removeAuthSession } from "~/lib/auth.functions";
+import { api } from "../../convex/_generated/api";
 
-const viewerQuery: FunctionReference<"query"> = anyApi.users.viewer;
 const dashboardLinks = [
 	{ to: "/dashboard", label: "Overview", icon: Home },
 	{ to: "/dashboard/design-system", label: "Design System", icon: Layers3 },
 ] as const;
 
 export const Route = createFileRoute("/dashboard")({
+	beforeLoad: async () => {
+		const session = await getAuthSession();
+		if (!session) {
+			throw redirect({ to: "/" });
+		}
+	},
 	component: DashboardLayoutRoute,
 });
 
 function DashboardLayoutRoute() {
-	return (
-		<>
-			<AuthLoading>
-				<AuthPendingMessage />
-			</AuthLoading>
-			<Authenticated>
-				<DashboardShell />
-			</Authenticated>
-			<Unauthenticated>
-				<RedirectToLogin />
-			</Unauthenticated>
-		</>
-	);
-}
-
-function AuthPendingMessage() {
-	return (
-		<div className="flex min-h-screen items-center justify-center px-4">
-			<p className="text-sm text-muted-foreground">Checking your session…</p>
-		</div>
-	);
-}
-
-function RedirectToLogin() {
-	const navigate = useNavigate();
-
-	useEffect(() => {
-		navigate({ to: "/" });
-	}, [navigate]);
-
-	return (
-		<div className="flex min-h-screen items-center justify-center px-4">
-			<p className="text-sm text-muted-foreground">
-				Redirecting to sign in…{" "}
-				<a className="underline" href="/">
-					Continue manually
-				</a>
-			</p>
-		</div>
-	);
+	return <DashboardShell />;
 }
 
 function DashboardShell() {
 	const { signOut } = useAuthActions();
-	const user = useQuery(viewerQuery);
+	const removeSession = useServerFn(removeAuthSession);
+	const user = useQuery(api.users.viewer);
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 
 	async function handleSignOut() {
-		await signOut();
+		await Promise.all([signOut(), removeSession()]);
 		navigate({ to: "/" });
 	}
 
@@ -167,7 +132,6 @@ function SessionFooter({
 				</div>
 				<div className="min-w-0">
 					<p className="truncate text-sm font-medium">{email ?? "Signed in"}</p>
-					<p className="text-xs text-muted-foreground">Authenticated session</p>
 				</div>
 			</div>
 			<Button
@@ -257,9 +221,6 @@ function ThemeToggle({
 					</div>
 					<div className="min-w-0" id="theme-toggle-label">
 						<p className="text-sm font-medium">Dark mode</p>
-						<p className="truncate text-xs text-muted-foreground">
-							Toggle the dashboard theme
-						</p>
 					</div>
 				</div>
 				<Switch
