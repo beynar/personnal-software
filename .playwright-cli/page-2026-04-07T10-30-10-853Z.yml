@@ -1,0 +1,17 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - paragraph [ref=e4]: Setup required
+    - heading "Convex is not configured" [level=1] [ref=e5]
+    - paragraph [ref=e6]:
+      - text: The app can't connect to Convex until
+      - code [ref=e7]: VITE_CONVEX_URL
+      - text: is set to a valid absolute URL in
+      - code [ref=e8]: .env.local
+      - text: .
+    - generic [ref=e9]:
+      - paragraph [ref=e10]: Expected entries
+      - generic [ref=e11]: CONVEX_DEPLOYMENT=dev:your-deployment-name VITE_CONVEX_URL=https://your-deployment-name.convex.cloud
+    - paragraph [ref=e12]:
+      - text: Run
+      - code [ref=e13]: npx convex dev
+      - text: to create a deployment and populate the env file, then refresh the page.

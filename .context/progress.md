@@ -15,6 +15,7 @@
 - **Convex file storage pattern**: 3-step upload: `generateUploadUrl` → `fetch(url, {method:"POST", body:file})` → `saveFile` mutation. Use `ctx.storage.generateUploadUrl()`, `ctx.storage.delete()`, `ctx.storage.getUrl()` for blob operations. Track metadata in a custom table with `v.id("_storage")` reference.
 - **TanStack Router flat routes**: Use dot notation for nested paths: `examples.file-upload.tsx` → `/examples/file-upload`. No need for directory structure or layout routes.
 - **Convex generic ctx type casting**: When using `mutationGeneric`/`queryGeneric`, cast `ctx.db` methods with a typed alias (`type AnyFn = (...args: any[]) => any`) to avoid Biome's `noBannedTypes` rule rejecting `Function`. Add a single `biome-ignore` comment for the type alias.
+- **Convex optimistic updates**: Use `useMutation(ref).withOptimisticUpdate((store, args) => { store.getQuery(ref, queryArgs); store.setQuery(ref, queryArgs, newValue); })`. Import `OptimisticLocalStore` from `convex/browser`. Typed `FunctionReference` with 4 generic args enables type-safe optimistic reads.
 
 ## US-001: Scaffold TanStack Start app with Cloudflare deployment
 - Created full TanStack Start scaffold with Vite 7 + Cloudflare Workers deployment
@@ -107,3 +108,45 @@
   - Biome rejects bare `Function` type — use a typed alias with `biome-ignore` comment
   - TanStack Router flat route convention: `examples.file-upload.tsx` → `/examples/file-upload`
   - Route tree auto-regenerates on `vite build`, resolving `FileRoutesByPath` type errors for new routes
+
+## US-006: Add Convex real-time data example pattern
+- Created `convex/realtime.ts` with 3 functions: `getCounter` (query), `incrementCounter` (mutation), `resetCounter` (mutation)
+- Added `counters` table to `convex/schema.ts` with name, value fields and `by_name` index
+- Created `app/routes/examples.realtime.tsx` with real-time shared counter UI:
+  - Two independent counters (Global and Secondary) demonstrating per-query subscriptions
+  - Increment (+1, +10), decrement (-1), and reset buttons
+  - Optimistic updates via `useMutation().withOptimisticUpdate()` for instant UI feedback
+  - Live indicator showing real-time sync status
+  - Explanation banner describing how Convex reactivity works
+  - Auth guard with redirect to login
+- Well-commented code explaining Convex subscription pattern at both backend and frontend levels
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - `useMutation(ref).withOptimisticUpdate(fn)` takes `(store: OptimisticLocalStore, args)` — import `OptimisticLocalStore` from `convex/browser`
+  - `store.getQuery(queryRef, args)` reads current cached value; `store.setQuery(queryRef, args, newValue)` sets optimistic value
+  - `FunctionReference<"query", "public", InputType, OutputType>` with 4 type args enables type-safe optimistic store reads
+  - Convex subscriptions are per (query, args) pair — multiple components with different args get independent updates
+  - Biome auto-fix (`--fix --unsafe`) handles import sorting and formatting in one pass
+
+## US-007: Add Cloudflare features: Cron Triggers and Durable Objects patterns
+- Updated `wrangler.toml` with commented-out cron trigger configuration (`[triggers]` section) with 3 example schedules (hourly, daily, weekly) and commented-out Durable Objects bindings + migrations
+- Created `app/worker/scheduled.ts` with `handleScheduled()` handler that dispatches on `event.cron` pattern, plus 3 example task implementations: session cleanup, daily archival, weekly digest
+- Created `app/worker/rate-limiter.ts` with `RateLimiter` Durable Object class implementing sliding-window rate limiting with `/check`, `/reset`, `/status` endpoints, alarm-based cleanup, and a `checkRateLimit()` helper function
+- Installed `@cloudflare/workers-types` and added to `tsconfig.json` types array for Cloudflare global types (ScheduledEvent, DurableObject, DurableObjectState, etc.)
+- All patterns have extensive inline comments explaining usage, activation steps, and common personal software use cases
+- Files changed: `wrangler.toml`, `app/worker/scheduled.ts` (new), `app/worker/rate-limiter.ts` (new), `tsconfig.json`, `package.json`
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - Biome rejects empty `interface Env {}` — use `type Env = Record<string, unknown>` for placeholder env types
+  - `@cloudflare/workers-types` provides global types for ScheduledEvent, DurableObject, DurableObjectState, DurableObjectNamespace — add to tsconfig `types` array
+  - Cron triggers only run in production; test locally with `wrangler dev --test-scheduled` + curl to `/__scheduled`
+  - Durable Object migrations in wrangler.toml use `[[migrations]]` with unique `tag` and `new_classes` array
+  - DO `alarm()` method enables delayed/scheduled work within a Durable Object instance — useful for cleanup tasks
+
+## US-008: Write getting-started documentation in README
+- Created comprehensive README.md with all sections required by acceptance criteria
+- Covers: prerequisites, Convex CLI installation (global + npx), .env.local setup, dual-terminal dev workflow (convex dev + npm run dev), Cloudflare deployment (wrangler deploy), project structure tree, all 6 example patterns with descriptions, available scripts table, routing convention, path aliases
+- Files changed: `README.md` (new)
+- **Learnings for future iterations:**
+  - README was straightforward since all context was available from prior US progress notes
+  - Project uses `npm run deploy` which maps to `wrangler deploy` — no separate build step needed in the script since vite build is implicit

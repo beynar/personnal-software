@@ -11,6 +11,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
+	AuthLoading,
 	Authenticated,
 	Unauthenticated,
 	useMutation,
@@ -35,6 +36,9 @@ export const Route = createFileRoute("/examples/file-upload")({
 function FileUploadPage() {
 	return (
 		<>
+			<AuthLoading>
+				<AuthPendingMessage />
+			</AuthLoading>
 			<Authenticated>
 				<FileUploadLayout />
 			</Authenticated>
@@ -45,12 +49,30 @@ function FileUploadPage() {
 	);
 }
 
+function AuthPendingMessage() {
+	return (
+		<div className="flex min-h-screen items-center justify-center px-4">
+			<p className="text-sm text-muted-foreground">Checking your session…</p>
+		</div>
+	);
+}
+
 function RedirectToLogin() {
 	const navigate = useNavigate();
 	useEffect(() => {
 		navigate({ to: "/" });
 	}, [navigate]);
-	return null;
+
+	return (
+		<div className="flex min-h-screen items-center justify-center px-4">
+			<p className="text-sm text-muted-foreground">
+				Redirecting to sign in…{" "}
+				<a href="/" className="underline">
+					Continue manually
+				</a>
+			</p>
+		</div>
+	);
 }
 
 // --- Main layout ---

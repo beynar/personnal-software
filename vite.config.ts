@@ -6,12 +6,17 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
 	plugins: [
+		cloudflare({
+			viteEnvironment: { name: "ssr" },
+		}),
 		tanstackStart({
 			srcDirectory: "app",
 		}),
-		cloudflare(),
 		tailwindcss(),
 	],
+	server: {
+		port: 8888,
+	},
 	resolve: {
 		alias: {
 			"~": fileURLToPath(new URL("./app", import.meta.url)),

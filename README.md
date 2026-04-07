@@ -2,6 +2,10 @@
 
 A full-stack starter template combining [TanStack Start](https://tanstack.com/start) for the frontend, [Convex](https://convex.dev) for the real-time backend, and [Cloudflare Workers](https://developers.cloudflare.com/workers/) for edge deployment. Includes authentication, file uploads, real-time data, and Cloudflare-specific patterns (Cron Triggers, Durable Objects).
 
+## Bootstrap First
+
+For a fresh clone, follow [BOOTSTRAP.md](./BOOTSTRAP.md) before doing anything else. It contains the exact local bootstrap flow, Convex Auth setup, and the Wrangler-based Cloudflare deployment procedure for this repo.
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -31,81 +35,39 @@ cd bubbly-dragon
 npm install
 ```
 
-### 2. Set up Convex
+### 2. Bootstrap the project
 
-If you don't have the Convex CLI installed globally:
+Do not improvise the setup. Follow [BOOTSTRAP.md](./BOOTSTRAP.md) exactly.
 
-```bash
-# Option A: Install globally
-npm install -g convex
-
-# Option B: Use npx (no global install needed)
-npx convex dev
-```
-
-Create a new Convex deployment and push the schema:
+The short version is:
 
 ```bash
-npx convex dev
-```
-
-This will:
-- Prompt you to log in (if not already)
-- Create a new project/deployment
-- Generate a `.env.local` file with your deployment credentials
-- Start watching for backend changes
-
-### 3. Configure environment variables
-
-After running `npx convex dev`, a `.env.local` file is created automatically with:
-
-```env
-CONVEX_DEPLOYMENT=dev:your-deployment-name
-VITE_CONVEX_URL=https://your-deployment-name.convex.cloud
-```
-
-If you need to create this file manually:
-
-```bash
-cp .env.local.example .env.local
-# Edit .env.local with your Convex deployment URL
-```
-
-### 4. Start development
-
-You need **two terminals** running simultaneously:
-
-```bash
-# Terminal 1 — Convex backend (watches convex/ for changes, syncs schema & functions)
-npx convex dev
-
-# Terminal 2 — TanStack Start dev server (Vite)
+npm install
+npx convex dev --once --typecheck disable
+npx @convex-dev/auth --web-server-url http://localhost:8888
+npx convex dev --once --typecheck disable
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
+The local app runs at `http://localhost:8888`.
+
+If you want live Convex watching in parallel, run `npx convex dev` in a second terminal.
 
 ## Deployment to Cloudflare
 
-Build and deploy to Cloudflare Workers:
+Use [BOOTSTRAP.md](./BOOTSTRAP.md) for the full deploy procedure.
 
-```bash
-npm run build
-wrangler deploy
-```
+Important details:
 
-Or in one step:
+- Deploy Convex first with `npx convex deploy`
+- Configure Convex Auth for the final public URL with `npx @convex-dev/auth --prod --web-server-url <url>`
+- Push Worker secrets with Wrangler CLI, not `wrangler.toml`
+- Deploy the generated SSR worker config at `dist/server/wrangler.json`
+
+The repository script already does the correct Worker deploy:
 
 ```bash
 npm run deploy
-```
-
-Make sure your Convex environment variables are set in your Cloudflare Worker settings or `wrangler.toml`.
-
-For production Convex, deploy your backend first:
-
-```bash
-npx convex deploy --prod
 ```
 
 ## Project Structure
@@ -181,10 +143,10 @@ Sliding-window rate limiter implemented as a Cloudflare Durable Object with alar
 
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | Start the Vite dev server (port 5173) |
+| `npm run dev` | Start the Vite dev server on port 8888 |
 | `npm run build` | Build for production |
 | `npm run preview` | Preview the production build locally |
-| `npm run deploy` | Deploy to Cloudflare Workers (`wrangler deploy`) |
+| `npm run deploy` | Build and deploy the generated Cloudflare Worker config |
 | `npm run typecheck` | Run TypeScript type checking |
 | `npm run lint` | Run Biome linter |
 | `npm run lint:fix` | Auto-fix lint and formatting issues |

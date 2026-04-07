@@ -1,6 +1,11 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+import {
+	AuthLoading,
+	Authenticated,
+	Unauthenticated,
+	useQuery,
+} from "convex/react";
 import { type FunctionReference, anyApi } from "convex/server";
 import { useEffect } from "react";
 import { Button } from "~/components/ui/button";
@@ -14,6 +19,9 @@ export const Route = createFileRoute("/dashboard")({
 function DashboardPage() {
 	return (
 		<>
+			<AuthLoading>
+				<AuthPendingMessage />
+			</AuthLoading>
 			<Authenticated>
 				<DashboardLayout />
 			</Authenticated>
@@ -24,12 +32,30 @@ function DashboardPage() {
 	);
 }
 
+function AuthPendingMessage() {
+	return (
+		<div className="flex min-h-screen items-center justify-center px-4">
+			<p className="text-sm text-muted-foreground">Checking your session…</p>
+		</div>
+	);
+}
+
 function RedirectToLogin() {
 	const navigate = useNavigate();
 	useEffect(() => {
 		navigate({ to: "/" });
 	}, [navigate]);
-	return null;
+
+	return (
+		<div className="flex min-h-screen items-center justify-center px-4">
+			<p className="text-sm text-muted-foreground">
+				Redirecting to sign in…{" "}
+				<a href="/" className="underline">
+					Continue manually
+				</a>
+			</p>
+		</div>
+	);
 }
 
 function DashboardLayout() {

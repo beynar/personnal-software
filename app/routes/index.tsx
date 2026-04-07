@@ -85,12 +85,19 @@ function LoginForm() {
 					name="email"
 					type="email"
 					placeholder="you@example.com"
+					autoComplete="email"
 					required
 				/>
 			</div>
 			<div className="space-y-2">
 				<Label htmlFor="login-password">Password</Label>
-				<Input id="login-password" name="password" type="password" required />
+				<Input
+					id="login-password"
+					name="password"
+					type="password"
+					autoComplete="current-password"
+					required
+				/>
 			</div>
 			{error && <p className="text-sm text-destructive">{error}</p>}
 			<input type="hidden" name="flow" value="signIn" />
@@ -139,12 +146,19 @@ function SignUpForm() {
 					name="email"
 					type="email"
 					placeholder="you@example.com"
+					autoComplete="email"
 					required
 				/>
 			</div>
 			<div className="space-y-2">
 				<Label htmlFor="signup-password">Password</Label>
-				<Input id="signup-password" name="password" type="password" required />
+				<Input
+					id="signup-password"
+					name="password"
+					type="password"
+					autoComplete="new-password"
+					required
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label htmlFor="signup-confirm">Confirm Password</Label>
@@ -152,6 +166,7 @@ function SignUpForm() {
 					id="signup-confirm"
 					name="confirmPassword"
 					type="password"
+					autoComplete="new-password"
 					required
 				/>
 			</div>
