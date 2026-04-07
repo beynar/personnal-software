@@ -1,4 +1,3 @@
-import { useAuthActions } from "@convex-dev/auth/react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -12,6 +11,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { authClient } from "~/lib/auth-client";
 import { checkBetterAuthSession } from "~/lib/auth.functions";
 import { PROJECT_NAME } from "~/lib/project";
 
@@ -55,7 +55,6 @@ function HomePage() {
 }
 
 function LoginForm() {
-	const { signIn } = useAuthActions();
 	const navigate = useNavigate();
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -65,8 +64,17 @@ function LoginForm() {
 		setError("");
 		setLoading(true);
 		const formData = new FormData(e.currentTarget);
+		const email = formData.get("email") as string;
+		const password = formData.get("password") as string;
 		try {
-			await signIn("password", formData);
+			const { error: authError } = await authClient.signIn.email({
+				email,
+				password,
+			});
+			if (authError) {
+				setError(authError.message ?? "Failed to sign in");
+				return;
+			}
 			navigate({ to: "/dashboard" });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to sign in");
@@ -99,7 +107,6 @@ function LoginForm() {
 				/>
 			</div>
 			{error && <p className="text-sm text-destructive">{error}</p>}
-			<input type="hidden" name="flow" value="signIn" />
 			<Button type="submit" className="w-full" disabled={loading}>
 				{loading ? "Signing in…" : "Sign In"}
 			</Button>
@@ -108,7 +115,6 @@ function LoginForm() {
 }
 
 function SignUpForm() {
-	const { signIn } = useAuthActions();
 	const navigate = useNavigate();
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -116,20 +122,32 @@ function SignUpForm() {
 	async function handleSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		setError("");
-		const form = e.currentTarget;
-		const formData = new FormData(form);
+		const formData = new FormData(e.currentTarget);
+		const email = formData.get("email") as string;
 		const password = formData.get("password") as string;
 		const confirmPassword = formData.get("confirmPassword") as string;
+		const name = formData.get("name") as string;
+		const superAdminPassword = formData.get("superAdminPassword") as string;
 
 		if (password !== confirmPassword) {
 			setError("Passwords do not match");
 			return;
 		}
 
-		formData.delete("confirmPassword");
 		setLoading(true);
 		try {
-			await signIn("password", formData);
+			const { error: authError } = await authClient.signUp.email(
+				{ email, password, name },
+				{
+					headers: {
+						"x-super-admin-password": superAdminPassword,
+					},
+				},
+			);
+			if (authError) {
+				setError(authError.message ?? "Failed to create account");
+				return;
+			}
 			navigate({ to: "/dashboard" });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to create account");
@@ -195,7 +213,6 @@ function SignUpForm() {
 				/>
 			</div>
 			{error && <p className="text-sm text-destructive">{error}</p>}
-			<input type="hidden" name="flow" value="signUp" />
 			<Button type="submit" className="w-full" disabled={loading}>
 				{loading ? "Creating account…" : "Sign Up"}
 			</Button>

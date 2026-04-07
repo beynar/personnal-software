@@ -4,6 +4,7 @@ import {
 	createClient,
 } from "@convex-dev/better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { type BetterAuthOptions, betterAuth } from "better-auth/minimal";
 import { components, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -74,6 +75,19 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 			requireEmailVerification: false,
 		},
 		plugins: [convex({ authConfig })],
+		hooks: {
+			before: createAuthMiddleware(async (ctx) => {
+				if (ctx.path !== "/sign-up/email") return;
+				const superAdminPassword = process.env.SUPER_ADMIN_SIGNUP_PASSWORD;
+				if (!superAdminPassword) return;
+				const provided = ctx.headers?.get("x-super-admin-password");
+				if (provided !== superAdminPassword) {
+					throw new APIError("FORBIDDEN", {
+						message: "Invalid super admin password",
+					});
+				}
+			}),
+		},
 	}) satisfies BetterAuthOptions;
 
 // Better Auth instance factory (used by HTTP routes and server-side auth calls)

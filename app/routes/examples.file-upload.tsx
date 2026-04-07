@@ -8,7 +8,6 @@
 // 4. listFiles query → real-time subscription keeps the file list updated
 // 5. deleteFile mutation → removes both the storage blob and metadata
 
-import { useAuthActions } from "@convex-dev/auth/react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
 	AuthLoading,
@@ -20,6 +19,7 @@ import {
 import { type FunctionReference, anyApi } from "convex/server";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
+import { authClient } from "~/lib/auth-client";
 
 // --- Convex function references (avoids needing _generated API) ---
 const generateUploadUrlMutation: FunctionReference<"mutation"> =
@@ -77,11 +77,10 @@ function RedirectToLogin() {
 
 // --- Main layout ---
 function FileUploadLayout() {
-	const { signOut } = useAuthActions();
 	const navigate = useNavigate();
 
 	async function handleSignOut() {
-		await signOut();
+		await authClient.signOut();
 		navigate({ to: "/" });
 	}
 

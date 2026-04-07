@@ -1,4 +1,3 @@
-import { useAuthActions } from "@convex-dev/auth/react";
 import {
 	Link,
 	Outlet,
@@ -27,6 +26,7 @@ import {
 } from "~/components/ui/sidebar";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
+import { authClient } from "~/lib/auth-client";
 import { checkBetterAuthSession } from "~/lib/auth.functions";
 import { PROJECT_INITIALS, PROJECT_NAME } from "~/lib/project";
 import { api } from "../../convex/_generated/api";
@@ -51,13 +51,12 @@ function DashboardLayoutRoute() {
 }
 
 function DashboardShell() {
-	const { signOut } = useAuthActions();
 	const user = useQuery(api.users.viewer);
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 
 	async function handleSignOut() {
-		await signOut();
+		await authClient.signOut();
 		navigate({ to: "/" });
 	}
 

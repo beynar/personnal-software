@@ -3,6 +3,9 @@
 - **Better Auth local component install**: `convex/betterAuth/` is a Convex component directory with `convex.config.ts` (defineComponent), `schema.ts` (generated tables), `auth.ts` (static instance for CLI), `adapter.ts` (createApi). Register in app's `convex/convex.config.ts` via `app.use(betterAuth)`.
 - **Better Auth user model**: Auth component has its own `user` table with `userId` field linking to app's `users` table. Use `authComponent.safeGetAuthUser(ctx)` to get the auth user, then `ctx.db.get(authUser.userId)` for the app user. Triggers sync email between auth user and app user.
 - **Better Auth type bootstrapping**: `components.betterAuth` and `internal.auth` types only resolve after `npx convex dev`. Use `as any` casts with biome-ignore comments during scaffold phase; types become correct once Convex generates them.
+- **Better Auth frontend wiring**: `app/lib/auth-client.ts` creates the browser auth client with `createAuthClient({ plugins: [convexClient()] })` from `better-auth/react` + `@convex-dev/better-auth/client/plugins`. `app/lib/auth-server.ts` exports `convexBetterAuthReactStart({ convexUrl, convexSiteUrl })` for SSR token fetching and auth request proxying. Root uses `ConvexBetterAuthProvider` from `@convex-dev/better-auth/react` with both `client` and `authClient` props.
+- **Better Auth client API for auth flows**: Use `authClient.signIn.email({ email, password })` for login, `authClient.signUp.email({ email, password, name })` for signup, and `authClient.signOut()` for sign-out. These return `{ data, error }` — check `error` for auth failures instead of catching exceptions. Extra headers can be passed as a second arg: `authClient.signUp.email(body, { headers: { ... } })`.
+- **Better Auth server hooks**: Use `createAuthMiddleware` from `better-auth/api` in `hooks.before` of `BetterAuthOptions` to intercept requests by path (e.g., `/sign-up/email`). Use `APIError` from `better-auth/api` to reject requests with proper HTTP status codes.
 - **TanStack Start v1.167+ uses Vite directly** — no vinxi, no app.config.ts. Config goes in `vite.config.ts` with `tanstackStart()` plugin from `@tanstack/react-start/plugin/vite`.
 - **srcDirectory defaults to `"src"`** — must set `srcDirectory: "app"` in tanstackStart() options to use `app/` directory.
 - **Router entry must export `getRouter()`** — not `createRouter`. The plugin resolves `router.tsx` in srcDirectory and expects this named export.
@@ -180,3 +183,51 @@
   - Biome-ignore comments must be directly above the line containing the violation — not separated by other code lines
   - `components` from `_generated/api` is `{}` until `npx convex dev` regenerates with the component registered; use `as any` cast
   - `ssr.noExternal: ["@convex-dev/better-auth"]` in vite.config.ts is required for TanStack Start SSR to bundle the package correctly
+
+## US-002: Add the TanStack Start Better Auth server and root provider
+- Created `app/lib/auth-server.ts` exporting `getToken`, `handler`, `fetchAuthQuery`, `fetchAuthMutation` from `convexBetterAuthReactStart({ convexUrl, convexSiteUrl })`
+- Created `app/lib/auth-client.ts` exporting `authClient` from `createAuthClient({ plugins: [convexClient()] })` — required as a prop for `ConvexBetterAuthProvider`
+- Updated `app/routes/__root.tsx` — replaced `ConvexAuthProvider` from `@convex-dev/auth/react` with `ConvexBetterAuthProvider` from `@convex-dev/better-auth/react`, passing both `client` and `authClient` props
+- Client auth state (`useConvexAuth()`, `Authenticated`, `Unauthenticated`, `AuthLoading` from `convex/react`) remains fully compatible — `ConvexBetterAuthProvider` wraps `ConvexProviderWithAuth` internally
+- Missing-config fallback still works — `ConvexBetterAuthProvider` is only rendered when `convexUrl` is valid
+- Files changed: `app/lib/auth-server.ts` (new), `app/lib/auth-client.ts` (new), `app/routes/__root.tsx` (modified)
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - `ConvexBetterAuthProvider` requires both `client` (ConvexReactClient) and `authClient` (Better Auth client with convexClient plugin) props
+  - `convexClient()` from `@convex-dev/better-auth/client/plugins` is required as a plugin in `createAuthClient()` — it adds the `convex.token()` method used internally by the provider
+  - `createAuthClient` from `better-auth/react` provides React hooks (`useSession`) used by the provider internally
+  - `convexBetterAuthReactStart` needs both `convexUrl` (ending in `.convex.cloud`) and `convexSiteUrl` (ending in `.convex.site`) — both available as `VITE_CONVEX_URL` and `VITE_CONVEX_SITE_URL` env vars
+  - `ConvexBetterAuthProvider` internally uses `ConvexProviderWithAuth` from `convex/react`, so all existing `useConvexAuth()`, `Authenticated`, `Unauthenticated` consumers work without changes
+  - The auth-server module exports `handler` for proxying auth requests and `getToken` for SSR token fetching — these will be wired into server routes in a future story
+
+## US-003: Remove the duplicate TanStack session cookie auth path
+- Replaced `beforeLoad` route guards in `index.tsx` and `dashboard.tsx` to use `checkBetterAuthSession()` (calls `getToken` from Better Auth) instead of `getAuthSession()` (which read the custom `bd_auth` cookie)
+- Removed `syncAuthSession()` calls from login and signup form handlers — Better Auth manages its own session cookie
+- Removed `removeAuthSession()` from dashboard sign-out — `signOut()` from auth actions handles session cleanup
+- Rewrote `app/lib/auth.functions.ts` to export a single `checkBetterAuthSession` server function backed by `getToken` from `~/lib/auth-server`
+- Deleted `app/lib/session.server.ts` (the `bd_auth` cookie implementation)
+- Files changed: `app/lib/auth.functions.ts` (rewritten), `app/lib/session.server.ts` (deleted), `app/routes/index.tsx` (modified), `app/routes/dashboard.tsx` (modified)
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - `getToken` from `convexBetterAuthReactStart` returns a token string if authenticated, falsy otherwise — wrapping it in a `createServerFn` makes it callable from `beforeLoad`
+  - Better Auth manages its own session cookie automatically — no need for a parallel cookie sync path
+  - `signOut()` from `useAuthActions()` clears the Better Auth session — no separate cookie cleanup needed
+  - `AUTH_SESSION_SECRET` env var is no longer required after removing the custom cookie path
+
+## US-004: Migrate sign-in, sign-up, sign-out, and the super-admin signup gate
+- Replaced `useAuthActions()` from `@convex-dev/auth/react` with Better Auth client APIs (`authClient`) in all 3 files that used it
+- Login form now calls `authClient.signIn.email({ email, password })` instead of `signIn("password", formData)`
+- Signup form now calls `authClient.signUp.email({ email, password, name })` with the super admin password passed as an `x-super-admin-password` header
+- Sign-out in dashboard and file-upload example now calls `authClient.signOut()` instead of `signOut()` from `useAuthActions()`
+- Added `hooks.before` middleware in `convex/auth.ts` using `createAuthMiddleware` that intercepts `/sign-up/email` requests and validates the `x-super-admin-password` header against `process.env.SUPER_ADMIN_SIGNUP_PASSWORD`
+- When `SUPER_ADMIN_SIGNUP_PASSWORD` env var is not set, signup is unrestricted (hook returns early)
+- Form errors still surface correctly — Better Auth client returns `{ error }` with a `message` property
+- Removed hidden `flow` field from forms (no longer needed — Better Auth uses distinct endpoints for sign-in vs sign-up)
+- Files changed: `app/routes/index.tsx`, `app/routes/dashboard.tsx`, `app/routes/examples.file-upload.tsx`, `convex/auth.ts`
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - Better Auth client methods (`signIn.email`, `signUp.email`, `signOut`) return `{ data, error }` instead of throwing — must check `error` field
+  - `authClient.signUp.email(body, fetchOptions)` accepts a second arg for custom headers — useful for passing out-of-band data like the super admin password
+  - `createAuthMiddleware` from `better-auth/api` receives a context with `path`, `headers`, `body` — use `ctx.path` to match specific endpoints
+  - `APIError` from `better-auth/api` accepts status code string ("FORBIDDEN") and options with `message` — this is the proper way to reject requests in hooks
+  - The `@convex-dev/auth/react` package (`useAuthActions`) is no longer imported anywhere in the frontend after this migration
