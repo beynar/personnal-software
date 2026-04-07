@@ -8,6 +8,8 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { ConvexReactClient } from "convex/react";
 import type { ReactNode } from "react";
+import { Toaster } from "~/components/ui/sonner";
+import { TooltipProvider } from "~/components/ui/tooltip";
 import appCss from "../app.css?url";
 
 const faviconHref = `data:image/svg+xml,${encodeURIComponent(
@@ -77,9 +79,12 @@ function RootDocument({ children }: { children: ReactNode }) {
 })();`}</script>
 			</head>
 			<body className="min-h-screen antialiased">
-				{children}
-				<TanStackRouterDevtools />
-				<Scripts />
+				<TooltipProvider>
+					{children}
+					<Toaster richColors />
+					<TanStackRouterDevtools />
+					<Scripts />
+				</TooltipProvider>
 			</body>
 		</html>
 	);

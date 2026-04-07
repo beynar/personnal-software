@@ -1,6 +1,12 @@
 <!-- convex-ai-start -->
 Before bootstrapping, configuring Convex, or deploying to Cloudflare, read `BOOTSTRAP.md` first and follow it exactly.
 
+Before implementing a feature, read:
+
+- `FEATURES.md` for route placement, Convex API placement, loaders, and auth guard rules
+- `DATA_MODEL.md` for schema, ownership, indexes, pagination, and relation rules
+- `UI_SYSTEM.md` for approved shadcn primitives, registry usage, tokens, and composition rules
+
 This project uses [Convex](https://convex.dev) as its backend.
 
 When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
