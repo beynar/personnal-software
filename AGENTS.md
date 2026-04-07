@@ -45,6 +45,32 @@ If setup or deploy is unclear, read `BOOTSTRAP.md`. Do not guess.
 - `convex/`: queries, mutations, actions, schema
 - `app/worker/`: Cloudflare-specific worker code
 
+## Cloudflare Patterns
+
+This repo can host Cloudflare-specific examples under `app/worker/examples/`.
+
+When the user asks for Cloudflare infrastructure examples:
+
+- put Worker examples under `app/worker/examples/`
+- keep them isolated from user-facing product code
+- document them in `CLOUDFLARE_EXAMPLES.md`
+- do not mix example infrastructure code into the main app routes unless the feature actually uses it
+
+Examples that are worth keeping in this template:
+
+- scheduled handlers
+- Durable Objects
+- sandbox / isolated execution patterns
+- browser rendering / remote browser automation patterns
+
+Rules:
+
+- examples must be clearly labeled as examples
+- examples must say what bindings or Wrangler config they need
+- examples must say whether they are production-ready or just a starting point
+- before implementing one, read `.agents/skills/cloudflare/SKILL.md` and verify the current product docs
+- if a feature needs one of these patterns for real, move from `examples/` into actual app code deliberately
+
 ## Convex Rules
 
 - read `convex/_generated/ai/guidelines.md` first

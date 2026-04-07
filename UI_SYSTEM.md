@@ -100,6 +100,7 @@ Docs patterns or higher-level compositions that should be built on top of the pr
 - `data-table` via the local `app/components/data-table/*` helpers plus `Table`
 - `date-picker` via `Popover + Button + Calendar`
 - `typography` via semantic HTML plus the token-aware utility scale
+- AI Elements examples and composites under `app/components/ai-elements/`
 
 Intentional exclusion:
 
@@ -118,10 +119,23 @@ Preferred order:
 Rules:
 
 - keep shadcn primitives in `app/components/ui/`
+- keep AI Elements registry components and examples in `app/components/ai-elements/`
 - keep feature-specific wrappers outside `ui/`
 - keep generated dependencies that are actually used; do not churn package choices unless the repo stops compiling or the import path is clearly wrong
 - if generated imports are wrong for this repo, fix them immediately instead of working around them downstream
 - if a docs page is not a registry primitive, implement it as a composition example instead of inventing a fake `ui/*.tsx` primitive
+
+## AI Elements
+
+This repo can host AI Elements registry components, but they are not part of the base `ui/` primitive layer.
+
+Rules:
+
+- install AI Elements into `app/components/ai-elements/`
+- keep the underlying shadcn primitives in `app/components/ui/`
+- surface AI Elements demos inside `/dashboard/design-system`
+- do not move AI Elements composites into `app/components/ui/` unless they are deliberately simplified into generic primitives used outside AI flows
+- keep AI Elements examples documented there as composite patterns, not as new `ui/` primitives
 
 ## Token usage
 

@@ -43,6 +43,7 @@ Expected result:
 - Convex creates or connects to a dev deployment
 - `.env.local` is written
 - `VITE_CONVEX_URL` is populated
+- you append `VITE_PROJECT_NAME` with the product name you want the template to show
 
 Verify:
 
@@ -55,7 +56,11 @@ You should see at least:
 ```env
 CONVEX_DEPLOYMENT=...
 VITE_CONVEX_URL=...
+VITE_PROJECT_NAME="Your Project Name"
 ```
+
+If `VITE_PROJECT_NAME` is missing, add it manually to `.env.local`. This value
+is used for the sign-in screen, the document title, and the dashboard brand.
 
 ## 3. Configure Convex Auth
 
@@ -192,6 +197,7 @@ Create a local file for deploy-time values if needed:
 # .env.production.local
 VITE_CONVEX_URL=...
 VITE_CONVEX_SITE_URL=...
+VITE_PROJECT_NAME="Your Project Name"
 ANTHROPIC_API_KEY=...
 ```
 

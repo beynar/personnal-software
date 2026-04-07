@@ -10,6 +10,7 @@ import { ConvexReactClient } from "convex/react";
 import type { ReactNode } from "react";
 import { Toaster } from "~/components/ui/sonner";
 import { TooltipProvider } from "~/components/ui/tooltip";
+import { PROJECT_NAME } from "~/lib/project";
 import appCss from "../app.css?url";
 
 const faviconHref = `data:image/svg+xml,${encodeURIComponent(
@@ -38,7 +39,7 @@ export const Route = createRootRoute({
 		meta: [
 			{ charSet: "utf-8" },
 			{ name: "viewport", content: "width=device-width, initial-scale=1" },
-			{ title: "Bubbly Dragon" },
+			{ title: PROJECT_NAME },
 		],
 		links: [
 			{ rel: "stylesheet", href: appCss },

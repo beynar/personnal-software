@@ -6,6 +6,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
 		Password({
 			profile(params) {
 				const email = normalizeEmail(params.email);
+				const name =
+					params.flow === "signUp"
+						? normalizeRequiredName(params.name)
+						: undefined;
 
 				if (params.flow === "signUp") {
 					const expectedPassword = process.env.SUPER_ADMIN_SIGNUP_PASSWORD;
@@ -20,7 +24,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
 					}
 				}
 
-				return { email };
+				return {
+					email,
+					...(name ? { name } : {}),
+				};
 			},
 		}),
 	],
@@ -37,4 +44,17 @@ function normalizeEmail(value: unknown) {
 	}
 
 	return email;
+}
+
+function normalizeRequiredName(value: unknown) {
+	if (typeof value !== "string") {
+		throw new Error("Missing `name` param");
+	}
+
+	const name = value.trim();
+	if (!name) {
+		throw new Error("Missing `name` param");
+	}
+
+	return name.slice(0, 80);
 }

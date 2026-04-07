@@ -14,6 +14,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { getAuthSession, syncAuthSession } from "~/lib/auth.functions";
+import { PROJECT_NAME } from "~/lib/project";
 
 export const Route = createFileRoute("/")({
 	beforeLoad: async () => {
@@ -30,7 +31,7 @@ function HomePage() {
 		<div className="flex min-h-screen items-center justify-center px-4">
 			<Card className="w-full max-w-sm">
 				<CardHeader className="text-center">
-					<CardTitle className="text-2xl">Bubbly Dragon</CardTitle>
+					<CardTitle className="text-2xl">{PROJECT_NAME}</CardTitle>
 					<CardDescription>
 						Sign in to your account or create a new one
 					</CardDescription>
@@ -152,6 +153,17 @@ function SignUpForm() {
 
 	return (
 		<form onSubmit={handleSubmit} className="mt-4 space-y-4">
+			<div className="space-y-2">
+				<Label htmlFor="signup-name">Name</Label>
+				<Input
+					id="signup-name"
+					name="name"
+					type="text"
+					placeholder="Ada Lovelace"
+					autoComplete="name"
+					required
+				/>
+			</div>
 			<div className="space-y-2">
 				<Label htmlFor="signup-email">Email</Label>
 				<Input

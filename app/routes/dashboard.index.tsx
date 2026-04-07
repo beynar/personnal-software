@@ -1,5 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, ArrowRight, Cloud, Database, Layers3 } from "lucide-react";
+import {
+	Activity,
+	ArrowRight,
+	Cloud,
+	Database,
+	Layers3,
+	UserRound,
+} from "lucide-react";
 import {
 	Card,
 	CardContent,
@@ -27,6 +34,12 @@ const overviewCards = [
 			"Use the nested page to inspect the current UI primitives available in the template.",
 		icon: Layers3,
 	},
+	{
+		title: "Profile scaffold",
+		description:
+			"Authenticated users now get a starter settings page for name, username, and bio.",
+		icon: UserRound,
+	},
 ] as const;
 
 export const Route = createFileRoute("/dashboard/")({
@@ -49,7 +62,7 @@ function DashboardOverviewPage() {
 						feel like one workspace instead of a set of unrelated screens.
 					</CardDescription>
 				</CardHeader>
-				<CardContent className="grid gap-4 p-4 md:grid-cols-3">
+				<CardContent className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
 					{overviewCards.map((card) => (
 						<div
 							className="rounded-2xl border border-border/70 bg-background/70 p-4"
@@ -90,6 +103,13 @@ function DashboardOverviewPage() {
 								available in the template.
 							</p>
 						</div>
+						<div className="rounded-xl border border-border/70 bg-background/70 p-4">
+							<p className="font-medium text-foreground">3. Profile</p>
+							<p className="mt-1">
+								Use the profile page as a starter settings surface for
+								user-owned account data.
+							</p>
+						</div>
 					</CardContent>
 				</Card>
 				<Card className="border-border/70">
@@ -111,13 +131,13 @@ function DashboardOverviewPage() {
 						<div className="rounded-xl bg-muted/60 p-4">
 							<p className="font-medium">Nested structure</p>
 							<p className="mt-1 text-sm text-muted-foreground">
-								The design system page is the second child route, which makes
-								the layout behavior obvious.
+								The dashboard now ships with overview, profile, and design
+								system child pages under one persistent shell.
 							</p>
 						</div>
 						<div className="flex items-center gap-2 text-sm font-medium text-foreground">
 							<ArrowRight className="size-4" />
-							Head to “Design System” in the sidebar.
+							Head to “Profile” or “Design System” in the sidebar.
 						</div>
 					</CardContent>
 				</Card>

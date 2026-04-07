@@ -6,7 +6,10 @@ const schema = defineSchema({
 	...authTables,
 	users: defineTable({
 		name: v.optional(v.string()),
+		username: v.optional(v.string()),
+		bio: v.optional(v.string()),
 		image: v.optional(v.string()),
+		imageStorageId: v.optional(v.id("_storage")),
 		email: v.optional(v.string()),
 		emailVerificationTime: v.optional(v.number()),
 		phone: v.optional(v.string()),
@@ -14,6 +17,7 @@ const schema = defineSchema({
 		isAnonymous: v.optional(v.boolean()),
 	})
 		.index("email", ["email"])
+		.index("by_username", ["username"])
 		.index("phone", ["phone"]),
 	// Shared counter — demonstrates Convex real-time subscriptions.
 	// A single document per counter name holds the current value.

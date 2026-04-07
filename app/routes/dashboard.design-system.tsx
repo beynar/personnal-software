@@ -29,6 +29,7 @@ import {
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { toast } from "sonner";
+import ExampleChatbot from "~/components/ai-elements/example-chatbot";
 import { DataTable } from "~/components/data-table/data-table";
 import {
 	Accordion,
@@ -481,6 +482,7 @@ function DesignSystemPage() {
 				<TimelineShowcase />
 				<TourShowcase />
 				<SidebarShowcase />
+				<AiElementsShowcase />
 				<TypographyShowcase />
 			</div>
 		</div>
@@ -2137,6 +2139,32 @@ function SidebarShowcase() {
 						</div>
 					</SidebarInset>
 				</SidebarProvider>
+			</div>
+		</ShowcaseCard>
+	);
+}
+
+function AiElementsShowcase() {
+	return (
+		<ShowcaseCard
+			className="border-border/70 xl:col-span-2"
+			description="AI Elements registry components installed into the app and rendered as a reusable chatbot scaffold."
+			title="AI Elements"
+		>
+			<div className="space-y-3">
+				<div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
+					<Badge variant="secondary">Registry import</Badge>
+					<Badge variant="outline">Composite example</Badge>
+					<span>
+						The chatbot lives in <code>app/components/ai-elements/</code> and
+						reuses the shared `ui/` primitives underneath.
+					</span>
+				</div>
+				<div className="overflow-hidden rounded-2xl border border-border/70 bg-background/70">
+					<div className="min-h-[42rem]">
+						<ExampleChatbot />
+					</div>
+				</div>
 			</div>
 		</ShowcaseCard>
 	);

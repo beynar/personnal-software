@@ -9,8 +9,9 @@ import {
 } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "convex/react";
-import { Home, Layers3, LogOut, Moon, Sun } from "lucide-react";
+import { Home, Layers3, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
 	Sidebar,
@@ -25,8 +26,10 @@ import {
 	SidebarTrigger,
 	useSidebar,
 } from "~/components/ui/sidebar";
+import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { getAuthSession, removeAuthSession } from "~/lib/auth.functions";
+import { PROJECT_INITIALS, PROJECT_NAME } from "~/lib/project";
 import { api } from "../../convex/_generated/api";
 
 const dashboardLinks = [
@@ -83,7 +86,7 @@ function DashboardShell() {
 						))}
 					</SidebarMenu>
 				</SidebarContent>
-				<DashboardSidebarFooter email={user?.email} onSignOut={handleSignOut} />
+				<DashboardSidebarFooter onSignOut={handleSignOut} user={user} />
 			</Sidebar>
 			<SidebarInset>
 				<header className="sticky top-0 z-10 border-b border-border/70 bg-background/95 backdrop-blur">
@@ -110,47 +113,96 @@ function BrandBlock() {
 
 	return (
 		<p className="truncate text-sm font-semibold tracking-tight text-sidebar-accent-foreground">
-			{isCollapsed && !isMobile ? "BD" : "Bubbly Dragon"}
+			{isCollapsed && !isMobile ? PROJECT_INITIALS : PROJECT_NAME}
 		</p>
 	);
 }
 
 function SessionFooter({
-	email,
+	user,
 	onSignOut,
 }: {
-	email: string | undefined;
+	user:
+		| {
+				email?: string;
+				image?: string | null;
+				name?: string;
+		  }
+		| null
+		| undefined;
 	onSignOut: () => Promise<void>;
 }) {
-	const initials = (email?.[0] ?? "U").toUpperCase();
+	if (user === undefined) {
+		return <SessionFooterSkeleton />;
+	}
+
+	const userLabel = user?.name ?? user?.email ?? "Signed in";
 
 	return (
 		<div className="rounded-xl border border-border/70 bg-background/80 p-3">
 			<div className="flex items-center gap-3">
-				<div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent font-medium text-accent-foreground">
-					{initials}
-				</div>
+				<Avatar className="size-10 border border-border/70" size="lg">
+					<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
+					<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
+				</Avatar>
 				<div className="min-w-0">
-					<p className="truncate text-sm font-medium">{email ?? "Signed in"}</p>
+					<p className="truncate text-sm font-medium">{userLabel}</p>
+					<p className="truncate text-xs text-muted-foreground">
+						{user?.email ?? "Account"}
+					</p>
 				</div>
 			</div>
-			<Button
-				className="mt-3 w-full justify-start"
-				onClick={onSignOut}
-				variant="outline"
-			>
-				<LogOut className="size-4" />
-				<span>Sign out</span>
-			</Button>
+			<div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+				<Button
+					className="size-9 p-0"
+					onClick={onSignOut}
+					type="button"
+					variant="outline"
+				>
+					<LogOut className="size-4" />
+					<span className="sr-only">Sign out</span>
+				</Button>
+				<Button asChild className="justify-start" variant="outline">
+					<Link to="/dashboard/profile">
+						<UserRound className="size-4" />
+						<span>Profile</span>
+					</Link>
+				</Button>
+			</div>
+		</div>
+	);
+}
+
+function SessionFooterSkeleton() {
+	return (
+		<div className="rounded-xl border border-border/70 bg-background/80 p-3">
+			<div className="flex items-center gap-3">
+				<Skeleton className="size-10 shrink-0 rounded-full" />
+				<div className="min-w-0 flex-1 space-y-2">
+					<Skeleton className="h-4 w-28 rounded-md" />
+					<Skeleton className="h-3 w-36 rounded-md" />
+				</div>
+			</div>
+			<div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+				<Skeleton className="size-9 rounded-md" />
+				<Skeleton className="h-9 w-full rounded-md" />
+			</div>
 		</div>
 	);
 }
 
 function DashboardSidebarFooter({
-	email,
+	user,
 	onSignOut,
 }: {
-	email: string | undefined;
+	user:
+		| {
+				email?: string;
+				image?: string | null;
+				name?: string;
+		  }
+		| null
+		| undefined;
 	onSignOut: () => Promise<void>;
 }) {
 	const { isCollapsed, isMobile } = useSidebar();
@@ -163,6 +215,17 @@ function DashboardSidebarFooter({
 					size="icon"
 					variant="ghost"
 				/>
+				<Button
+					asChild
+					className="m-0 h-16 w-full rounded-none border-b border-border-70"
+					size="icon"
+					variant="ghost"
+				>
+					<Link to="/dashboard/profile">
+						<UserRound className="size-5" />
+						<span className="sr-only">Profile</span>
+					</Link>
+				</Button>
 				<Button
 					className="m-0 h-16 w-full rounded-none border-0"
 					onClick={onSignOut}
@@ -179,7 +242,7 @@ function DashboardSidebarFooter({
 	return (
 		<SidebarFooter className="gap-4 flex flex-col">
 			<ThemeToggle />
-			<SessionFooter email={email} onSignOut={onSignOut} />
+			<SessionFooter onSignOut={onSignOut} user={user} />
 		</SidebarFooter>
 	);
 }
@@ -258,6 +321,20 @@ function SidebarLabel({ children }: { children: React.ReactNode }) {
 	const { isCollapsed, isMobile } = useSidebar();
 
 	return isCollapsed && !isMobile ? null : <span>{children}</span>;
+}
+
+function getInitials(value: string | undefined) {
+	if (!value) {
+		return "U";
+	}
+
+	const parts = value.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+
+	if (!parts.length) {
+		return "U";
+	}
+
+	return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
 function isActiveLink(pathname: string, to: string) {

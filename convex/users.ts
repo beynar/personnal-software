@@ -1,6 +1,10 @@
-import { query } from "./_generated/server";
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
 import { auth } from "./auth";
 
+/**
+ * Returns the authenticated user document for dashboard surfaces.
+ */
 export const viewer = query({
 	args: {},
 	handler: async (ctx) => {
@@ -8,6 +12,106 @@ export const viewer = query({
 		if (!userId) {
 			return null;
 		}
-		return await ctx.db.get(userId);
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			return null;
+		}
+
+		const image = user.imageStorageId
+			? await ctx.storage.getUrl(user.imageStorageId)
+			: user.image;
+
+		return {
+			...user,
+			image,
+		};
 	},
 });
+
+/**
+ * Updates the current user's profile fields with basic normalization and
+ * username uniqueness enforcement.
+ */
+export const updateProfile = mutation({
+	args: {
+		name: v.string(),
+		username: v.string(),
+		bio: v.string(),
+	},
+	handler: async (ctx, args) => {
+		const userId = await auth.getUserId(ctx);
+		if (!userId) {
+			throw new Error("Not authenticated");
+		}
+
+		const name = normalizeOptionalValue(args.name, 80);
+		const username = normalizeUsername(args.username);
+		const bio = normalizeOptionalValue(args.bio, 280);
+
+		if (username) {
+			const existingUser = await ctx.db
+				.query("users")
+				.withIndex("by_username", (query) => query.eq("username", username))
+				.unique();
+
+			if (existingUser && existingUser._id !== userId) {
+				throw new Error("Username is already taken");
+			}
+		}
+
+		await ctx.db.patch(userId, { bio, name, username });
+
+		return null;
+	},
+});
+
+/**
+ * Stores or clears the current user's uploaded profile image reference.
+ */
+export const updateProfileImage = mutation({
+	args: {
+		storageId: v.union(v.id("_storage"), v.null()),
+	},
+	handler: async (ctx, args) => {
+		const userId = await auth.getUserId(ctx);
+		if (!userId) {
+			throw new Error("Not authenticated");
+		}
+
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		if (user.imageStorageId && user.imageStorageId !== args.storageId) {
+			await ctx.storage.delete(user.imageStorageId);
+		}
+
+		await ctx.db.patch(userId, {
+			imageStorageId: args.storageId ?? undefined,
+		});
+
+		return null;
+	},
+});
+
+function normalizeOptionalValue(value: string, maxLength: number) {
+	const normalizedValue = value.trim().slice(0, maxLength);
+	return normalizedValue ? normalizedValue : undefined;
+}
+
+function normalizeUsername(value: string) {
+	const normalizedValue = value.trim().toLowerCase().replaceAll(/\s+/g, "-");
+
+	if (!normalizedValue) {
+		return undefined;
+	}
+
+	if (!/^[a-z0-9_-]{3,32}$/.test(normalizedValue)) {
+		throw new Error(
+			"Username must be 3-32 characters and use letters, numbers, hyphens, or underscores",
+		);
+	}
+
+	return normalizedValue;
+}
