@@ -7,7 +7,6 @@ import {
 	useLocation,
 	useNavigate,
 } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "convex/react";
 import { Home, Layers3, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -28,7 +27,7 @@ import {
 } from "~/components/ui/sidebar";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
-import { getAuthSession, removeAuthSession } from "~/lib/auth.functions";
+import { checkBetterAuthSession } from "~/lib/auth.functions";
 import { PROJECT_INITIALS, PROJECT_NAME } from "~/lib/project";
 import { api } from "../../convex/_generated/api";
 
@@ -39,8 +38,8 @@ const dashboardLinks = [
 
 export const Route = createFileRoute("/dashboard")({
 	beforeLoad: async () => {
-		const session = await getAuthSession();
-		if (!session) {
+		const isAuthenticated = await checkBetterAuthSession();
+		if (!isAuthenticated) {
 			throw redirect({ to: "/" });
 		}
 	},
@@ -53,13 +52,12 @@ function DashboardLayoutRoute() {
 
 function DashboardShell() {
 	const { signOut } = useAuthActions();
-	const removeSession = useServerFn(removeAuthSession);
 	const user = useQuery(api.users.viewer);
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 
 	async function handleSignOut() {
-		await Promise.all([signOut(), removeSession()]);
+		await signOut();
 		navigate({ to: "/" });
 	}
 

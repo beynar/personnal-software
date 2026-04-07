@@ -1,6 +1,5 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { type FormEvent, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -13,13 +12,13 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { getAuthSession, syncAuthSession } from "~/lib/auth.functions";
+import { checkBetterAuthSession } from "~/lib/auth.functions";
 import { PROJECT_NAME } from "~/lib/project";
 
 export const Route = createFileRoute("/")({
 	beforeLoad: async () => {
-		const session = await getAuthSession();
-		if (session) {
+		const isAuthenticated = await checkBetterAuthSession();
+		if (isAuthenticated) {
 			throw redirect({ to: "/dashboard" });
 		}
 	},
@@ -58,7 +57,6 @@ function HomePage() {
 function LoginForm() {
 	const { signIn } = useAuthActions();
 	const navigate = useNavigate();
-	const syncSession = useServerFn(syncAuthSession);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
@@ -67,13 +65,8 @@ function LoginForm() {
 		setError("");
 		setLoading(true);
 		const formData = new FormData(e.currentTarget);
-		const email = formData.get("email");
 		try {
 			await signIn("password", formData);
-			if (typeof email !== "string") {
-				throw new Error("Missing email");
-			}
-			await syncSession({ data: { email } });
 			navigate({ to: "/dashboard" });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to sign in");
@@ -117,7 +110,6 @@ function LoginForm() {
 function SignUpForm() {
 	const { signIn } = useAuthActions();
 	const navigate = useNavigate();
-	const syncSession = useServerFn(syncAuthSession);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
@@ -135,14 +127,9 @@ function SignUpForm() {
 		}
 
 		formData.delete("confirmPassword");
-		const email = formData.get("email");
 		setLoading(true);
 		try {
 			await signIn("password", formData);
-			if (typeof email !== "string") {
-				throw new Error("Missing email");
-			}
-			await syncSession({ data: { email } });
 			navigate({ to: "/dashboard" });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to create account");
