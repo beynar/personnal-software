@@ -17,7 +17,7 @@ Read this first.
 - React 19
 - TanStack Start + TanStack Router
 - Convex
-- `@convex-dev/auth`
+- `@convex-dev/better-auth`
 - Tailwind CSS v4
 - shadcn + Dice UI primitives in `app/components/ui/`
 - Sonner for notifications
