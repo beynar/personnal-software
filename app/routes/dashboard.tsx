@@ -10,6 +10,7 @@ import { useQuery } from "convex/react";
 import {
 	Building2,
 	Home,
+	Key,
 	Layers3,
 	LogOut,
 	Moon,
@@ -46,6 +47,7 @@ const dashboardLinks = [
 		label: "Organizations",
 		icon: Building2,
 	},
+	{ to: "/dashboard/api-keys", label: "API Keys", icon: Key },
 	{ to: "/dashboard/design-system", label: "Design System", icon: Layers3 },
 ] as const;
 

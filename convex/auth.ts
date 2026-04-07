@@ -1,3 +1,4 @@
+import { apiKey } from "@better-auth/api-key";
 import {
 	type AuthFunctions,
 	type GenericCtx,
@@ -79,6 +80,9 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 			convex({ authConfig }),
 			organization({
 				allowUserToCreateOrganization: true,
+			}),
+			apiKey({
+				defaultPrefix: "bd_",
 			}),
 		],
 		hooks: {
