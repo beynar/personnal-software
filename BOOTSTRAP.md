@@ -10,9 +10,8 @@ This app depends on:
 
 - Node.js and npm
 - A Convex deployment
-- Convex Auth environment variables and HTTP routes
-- A local `.env.local` for Vite/TanStack Start
-- A local Worker secret source for TanStack Start route sessions
+- Better Auth environment variables (`BETTER_AUTH_SECRET`, `SITE_URL`)
+- A local `.env.local` for Vite/TanStack Start (`VITE_CONVEX_URL`, `VITE_CONVEX_SITE_URL`, `VITE_SITE_URL`)
 - Cloudflare Wrangler for deployment
 - Wrangler-managed secrets/bindings for any deployed Worker
 
@@ -20,7 +19,7 @@ This app depends on:
 
 - Do not guess environment variable names.
 - Do not deploy before Convex is working locally.
-- Do not assume Convex Auth is configured just because `convex/auth.ts` exists.
+- Do not assume Better Auth is configured just because `convex/auth.ts` exists.
 - Do not store secrets in `wrangler.toml`.
 - Use the Wrangler CLI for deployed Worker secrets.
 
@@ -62,29 +61,28 @@ VITE_PROJECT_NAME="Your Project Name"
 If `VITE_PROJECT_NAME` is missing, add it manually to `.env.local`. This value
 is used for the sign-in screen, the document title, and the dashboard brand.
 
-## 3. Configure Convex Auth
+## 3. Configure Better Auth environment variables
 
-This repo uses `@convex-dev/auth`. A fresh clone must configure the auth env vars too.
+This repo uses `@convex-dev/better-auth` (a local Convex component backed by Better Auth).
 
-For local development, use the local dev URL on port `8888`:
+Set the following environment variables on your Convex deployment:
 
 ```bash
-npx @convex-dev/auth --web-server-url http://localhost:8888
+npx convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
+npx convex env set SITE_URL "http://localhost:8888"
 ```
 
-This sets the required Convex auth variables such as:
+Required Convex env vars:
 
-- `SITE_URL`
-- `JWT_PRIVATE_KEY`
-- `JWKS`
+- `BETTER_AUTH_SECRET` — signing key for sessions and tokens
+- `SITE_URL` — the public URL where the app is served
+- `SUPER_ADMIN_SIGNUP_PASSWORD` — gate for account creation (optional for local dev)
 
-It may also generate files such as:
+Required `.env.local` vars (Vite build-time):
 
-- `convex/auth.config.ts`
-- `convex/http.ts`
-- `convex/tsconfig.json`
-
-If those files already exist, keep them unless you know they are wrong.
+- `VITE_CONVEX_URL` — Convex deployment URL (set automatically by `npx convex dev`)
+- `VITE_CONVEX_SITE_URL` — Convex site URL for HTTP routes
+- `VITE_SITE_URL` — public site URL (e.g. `http://localhost:8888`)
 
 ## 4. Push Convex functions again
 
@@ -104,21 +102,6 @@ npx convex env set SUPER_ADMIN_SIGNUP_PASSWORD "choose-a-long-random-secret"
 ```
 
 Use the same command against the production deployment before `npx convex deploy`.
-
-## 4.2 Configure the TanStack Start session secret
-
-Route protection now uses an encrypted HTTP-only cookie managed by the Worker
-runtime. For local development, add the secret to `.dev.vars`:
-
-```env
-AUTH_SESSION_SECRET=generate-at-least-32-random-characters
-```
-
-Generate one with:
-
-```bash
-openssl rand -base64 32
-```
 
 ## 5. Start local development
 
@@ -151,7 +134,7 @@ Before deploying, verify these manually:
 5. Visit `/examples/realtime`
 6. Visit `/examples/file-upload`
 
-If signup fails with `Missing environment variable JWT_PRIVATE_KEY`, step 3 was skipped or failed.
+If signup fails with `Missing environment variable BETTER_AUTH_SECRET`, step 3 was skipped or failed.
 
 If the page renders but buttons/forms do nothing, the client entry is broken. Check `app/client.tsx`.
 
@@ -201,14 +184,14 @@ VITE_PROJECT_NAME="Your Project Name"
 ANTHROPIC_API_KEY=...
 ```
 
-### 7.3 Configure Convex Auth for the deployed site URL
+### 7.3 Configure Better Auth for the deployed site URL
 
-Convex Auth needs the final public site URL.
+Better Auth needs the final public site URL set as `SITE_URL` on the Convex deployment.
 
-If you know the final deployed URL already, configure Convex Auth before deploy:
+If you know the final deployed URL already, configure it before deploy:
 
 ```bash
-npx @convex-dev/auth --prod --web-server-url https://your-public-site.example.com
+npx convex env set SITE_URL "https://your-public-site.example.com" --prod
 npx convex deploy
 ```
 
@@ -216,13 +199,13 @@ If you do not know the final Cloudflare URL yet:
 
 1. Deploy once with Wrangler
 2. Copy the resulting `workers.dev` or custom-domain URL
-3. Run the auth command with that URL
+3. Set `SITE_URL` to that URL
 4. Deploy again
 
 Example:
 
 ```bash
-npx @convex-dev/auth --prod --web-server-url https://your-worker.your-subdomain.workers.dev
+npx convex env set SITE_URL "https://your-worker.your-subdomain.workers.dev" --prod
 npx convex deploy
 ```
 
@@ -243,7 +226,6 @@ Push required values with Wrangler:
 ```bash
 printf '%s' "$VITE_CONVEX_URL" | npx wrangler secret put VITE_CONVEX_URL
 printf '%s' "$VITE_CONVEX_SITE_URL" | npx wrangler secret put VITE_CONVEX_SITE_URL
-printf '%s' "$AUTH_SESSION_SECRET" | npx wrangler secret put AUTH_SESSION_SECRET
 ```
 
 If you use Anthropic features, also set:
@@ -296,7 +278,8 @@ After deployment:
 
 If deployed auth fails but local auth works, the usual cause is one of:
 
-- `SITE_URL` in Convex does not match the deployed site URL
+- `SITE_URL` on the Convex deployment does not match the deployed site URL
+- `BETTER_AUTH_SECRET` is not set on the Convex deployment
 - `VITE_CONVEX_URL` in the deployed Worker does not match the intended Convex deployment
 - The Worker was deployed without the needed Wrangler secrets
 
@@ -307,7 +290,8 @@ Local:
 ```bash
 npm install
 npx convex dev --once --typecheck disable
-npx @convex-dev/auth --web-server-url http://localhost:8888
+npx convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
+npx convex env set SITE_URL "http://localhost:8888"
 npx convex dev --once --typecheck disable
 npm run dev
 ```
@@ -317,7 +301,9 @@ Deploy:
 ```bash
 npx wrangler login
 npx convex deploy
-npx @convex-dev/auth --prod --web-server-url https://your-public-site.example.com
+npx convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)" --prod
+npx convex env set SITE_URL "https://your-public-site.example.com" --prod
+npx convex env set SUPER_ADMIN_SIGNUP_PASSWORD "choose-a-long-random-secret" --prod
 npx convex deploy
 set -a
 source ./.env.production.local

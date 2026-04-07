@@ -263,3 +263,41 @@
   - Client methods: `authClient.useListOrganizations()` for reactive org list, `authClient.organization.create({ name, slug })` to create
   - `authClient.organization.create()` returns `{ data, error }` — same pattern as other Better Auth client methods
   - The organization plugin schema uses `metadata` as an optional string field (JSON-serialized) on the organization table
+
+## US-007: Add API key management on top of Better Auth
+- Added `apiKey({ defaultPrefix: "bd_" })` from `@better-auth/api-key` to the Better Auth server config plugins in `convex/auth.ts`
+- Added `apiKeyClient()` from `@better-auth/api-key/client` to the client config plugins in `app/lib/auth-client.ts`
+- Extended `convex/betterAuth/schema.ts` with `apikey` table containing all fields from the API key plugin schema (configId, name, start, referenceId, prefix, key, rate limit fields, remaining, expiresAt, timestamps, permissions, metadata) with indexes on configId, referenceId, and key
+- Created `app/routes/dashboard.api-keys.tsx` with full API key management UI:
+  - Create form with optional name field
+  - One-time key display banner with copy-to-clipboard after creation
+  - List of existing keys showing name/start prefix, status (Active/Disabled), created date, expiry
+  - Delete button per key with loading state
+- Added API Keys link with Key icon to dashboard sidebar in `app/routes/dashboard.tsx`
+- Files changed: `convex/auth.ts`, `app/lib/auth-client.ts`, `convex/betterAuth/schema.ts`, `app/routes/dashboard.api-keys.tsx` (new), `app/routes/dashboard.tsx`
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - `apiKey()` from `@better-auth/api-key` is the server plugin; `apiKeyClient()` from `@better-auth/api-key/client` is the client plugin — different import paths (unlike organization which uses `better-auth/client/plugins`)
+  - The API key plugin adds an `apikey` table (lowercase, no underscore) with many fields — date fields are stored as numbers in Convex
+  - `authClient.apiKey.list()` returns `{ data: { apiKeys: [...], total, limit, offset } }` — keys are nested under `data.apiKeys`, not directly in `data`
+  - `authClient.apiKey.create({ name })` returns `{ data: { key: "the-raw-key" } }` — the raw key is only available at creation time
+  - `authClient.apiKey.delete({ keyId })` deletes by key ID
+  - The `defaultPrefix` option adds a prefix to all generated keys (e.g., `bd_xxx...`) for easy identification
+  - `@better-auth/api-key@1.5.3` must match `better-auth@1.5.3` — already installed from US-001
+
+## US-008: Add provisional MCP auth support and remove old Convex Auth traces
+- Added `mcp({ loginPage: "/sign-in" })` plugin from `better-auth/plugins` to the Better Auth server config in `convex/auth.ts`
+- Extended `convex/betterAuth/schema.ts` with 3 MCP tables: `oauthApplication` (clientId, clientSecret, redirectUrls, type), `oauthAccessToken` (accessToken, refreshToken, scopes, expiry), `oauthConsent` (clientId, userId, scopes, consentGiven) — with appropriate indexes
+- Updated `BOOTSTRAP.md` — replaced all `@convex-dev/auth` CLI commands and references with Better Auth local install instructions using `BETTER_AUTH_SECRET`, `SITE_URL` env vars; removed `AUTH_SESSION_SECRET` and `JWT_PRIVATE_KEY` references
+- Updated `README.md` — replaced `@convex-dev/auth` references in tech stack table, bootstrap commands, and auth description; added "MCP Auth Support (Provisional)" section documenting all MCP endpoints and the deprecation path toward OAuth Provider plugin
+- Updated `DATA_MODEL.md` — replaced `@convex-dev/auth` with `@convex-dev/better-auth` and listed all component tables
+- Verified no remaining `@convex-dev/auth` source imports in any `.ts`/`.tsx` file
+- Files changed: `convex/auth.ts`, `convex/betterAuth/schema.ts`, `BOOTSTRAP.md`, `README.md`, `DATA_MODEL.md`
+- All quality checks pass: `npm run lint`, `npm run typecheck`, `npm run build`
+- **Learnings for future iterations:**
+  - The `mcp` server plugin is exported from the barrel `better-auth/plugins`, NOT from `better-auth/plugins/mcp` — the latter path only has client exports
+  - The MCP plugin adds 3 tables: `oauthApplication`, `oauthAccessToken`, `oauthConsent` — all with date fields stored as numbers in Convex
+  - The MCP plugin exposes `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`, `/mcp/authorize`, `/mcp/token`, `/mcp/register`, `/mcp/get-session` endpoints
+  - `MCPOptions` requires `loginPage` (string) and optionally `resource` and `oidcConfig`
+  - Better Auth marks the MCP plugin as heading toward deprecation in favor of the `oidc-provider` (OAuth Provider) plugin
+  - Client-side MCP utilities (`createMcpAuthClient`) are available from `better-auth/plugins/mcp/client`

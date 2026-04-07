@@ -14,7 +14,7 @@ If a query would need `filter`, the schema is probably missing an index.
 
 The starter schema currently contains:
 
-- auth tables from `@convex-dev/auth`
+- auth tables from `@convex-dev/better-auth` (user, session, account, verification, jwks, organization, member, invitation, apikey, oauthApplication, oauthAccessToken, oauthConsent)
 - `users`
 - `counters`
 - `files`

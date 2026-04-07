@@ -7,6 +7,7 @@ import {
 import { convex } from "@convex-dev/better-auth/plugins";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { type BetterAuthOptions, betterAuth } from "better-auth/minimal";
+import { mcp } from "better-auth/plugins";
 import { organization } from "better-auth/plugins/organization";
 import { components, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -83,6 +84,9 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 			}),
 			apiKey({
 				defaultPrefix: "bd_",
+			}),
+			mcp({
+				loginPage: "/sign-in",
 			}),
 		],
 		hooks: {

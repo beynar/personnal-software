@@ -13,7 +13,7 @@ For a fresh clone, follow [BOOTSTRAP.md](./BOOTSTRAP.md) before doing anything e
 | Framework | TanStack Start v1.167 (Vite-native, React 19) |
 | Routing | TanStack Router (file-based, flat routes) |
 | Backend | Convex (real-time database, auth, file storage) |
-| Auth | `@convex-dev/auth` with Password provider |
+| Auth | `@convex-dev/better-auth` (Better Auth local component) |
 | Styling | Tailwind CSS v4, shadcn/ui components |
 | Edge Runtime | Cloudflare Workers (via `@cloudflare/vite-plugin`) |
 | Tooling | Biome (lint + format), TypeScript 5.9 |
@@ -44,7 +44,8 @@ The short version is:
 ```bash
 npm install
 npx convex dev --once --typecheck disable
-npx @convex-dev/auth --web-server-url http://localhost:8888
+npx convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
+npx convex env set SITE_URL "http://localhost:8888"
 npx convex dev --once --typecheck disable
 npm run dev
 ```
@@ -60,7 +61,7 @@ Use [BOOTSTRAP.md](./BOOTSTRAP.md) for the full deploy procedure.
 Important details:
 
 - Deploy Convex first with `npx convex deploy`
-- Configure Convex Auth for the final public URL with `npx @convex-dev/auth --prod --web-server-url <url>`
+- Set `BETTER_AUTH_SECRET` and `SITE_URL` on the production Convex deployment
 - Push Worker secrets with Wrangler CLI, not `wrangler.toml`
 - Deploy the generated SSR worker config at `dist/server/wrangler.json`
 
@@ -94,7 +95,7 @@ npm run deploy
 │       └── rate-limiter.ts     # Durable Object: rate limiter
 ├── convex/                     # Convex backend
 │   ├── schema.ts               # Database schema (auth tables, files, counters)
-│   ├── auth.ts                 # Auth configuration (Password provider)
+│   ├── auth.ts                 # Auth configuration (Better Auth + MCP)
 │   ├── convex.config.ts        # Convex app config
 │   ├── users.ts                # User queries (viewer)
 │   ├── files.ts                # File upload/download/delete mutations & queries
@@ -112,7 +113,7 @@ npm run deploy
 ### Authentication (Login/Signup)
 **Route:** `/`
 
-Email/password authentication using `@convex-dev/auth` with the Password provider. Includes login and signup tabs with form validation and error handling.
+Email/password authentication using `@convex-dev/better-auth` with Better Auth's email provider. Includes login and signup tabs with form validation and error handling. Organization management, API key management, and provisional MCP auth support are available as Better Auth plugins.
 
 ### Authenticated Dashboard
 **Route:** `/dashboard`
@@ -138,6 +139,18 @@ Cloudflare scheduled event handler with example patterns for hourly cleanup, dai
 **File:** `app/worker/rate-limiter.ts`
 
 Sliding-window rate limiter implemented as a Cloudflare Durable Object with alarm-based cleanup. Enable by uncommenting the Durable Objects bindings in `wrangler.toml`.
+
+## MCP Auth Support (Provisional)
+
+This repo includes Better Auth's `mcp` plugin, which enables MCP clients to authenticate via OAuth 2.0 discovery and token endpoints. The plugin exposes:
+
+- `/.well-known/oauth-authorization-server` — OAuth discovery metadata
+- `/.well-known/oauth-protected-resource` — protected resource metadata
+- `/mcp/authorize` — authorization endpoint
+- `/mcp/token` — token endpoint
+- `/mcp/register` — dynamic client registration
+
+**This plugin is provisional.** Better Auth marks the `mcp` plugin as heading toward deprecation in favor of the `oidc-provider` (OAuth Provider) plugin. The current integration works for MCP authentication today, but plan to migrate to the OAuth Provider plugin when it stabilizes. See the [Better Auth OIDC Provider docs](https://www.better-auth.com/docs/plugins/oidc-provider) for the future direction.
 
 ## Available Scripts
 

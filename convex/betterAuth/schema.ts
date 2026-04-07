@@ -92,6 +92,46 @@ export const tables = {
 	})
 		.index("organizationId", ["organizationId"])
 		.index("email", ["email"]),
+	oauthApplication: defineTable({
+		name: v.string(),
+		icon: v.optional(v.union(v.null(), v.string())),
+		metadata: v.optional(v.union(v.null(), v.string())),
+		clientId: v.string(),
+		clientSecret: v.optional(v.union(v.null(), v.string())),
+		redirectUrls: v.string(),
+		type: v.string(),
+		disabled: v.optional(v.union(v.null(), v.boolean())),
+		userId: v.optional(v.union(v.null(), v.string())),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("clientId", ["clientId"])
+		.index("userId", ["userId"]),
+	oauthAccessToken: defineTable({
+		accessToken: v.string(),
+		refreshToken: v.string(),
+		accessTokenExpiresAt: v.number(),
+		refreshTokenExpiresAt: v.number(),
+		clientId: v.string(),
+		userId: v.optional(v.union(v.null(), v.string())),
+		scopes: v.string(),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("accessToken", ["accessToken"])
+		.index("refreshToken", ["refreshToken"])
+		.index("clientId", ["clientId"])
+		.index("userId", ["userId"]),
+	oauthConsent: defineTable({
+		clientId: v.string(),
+		userId: v.string(),
+		scopes: v.string(),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		consentGiven: v.boolean(),
+	})
+		.index("clientId", ["clientId"])
+		.index("userId", ["userId"]),
 	apikey: defineTable({
 		configId: v.string(),
 		name: v.optional(v.union(v.null(), v.string())),
