@@ -1,0 +1,8 @@
+.context
+node_modules
+.output
+dist
+.wrangler
+.env
+.env.local
+app/routeTree.gen.ts
