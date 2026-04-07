@@ -1,4 +1,4 @@
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import {
 	HeadContent,
 	Outlet,
@@ -10,6 +10,7 @@ import { ConvexReactClient } from "convex/react";
 import type { ReactNode } from "react";
 import { Toaster } from "~/components/ui/sonner";
 import { TooltipProvider } from "~/components/ui/tooltip";
+import { authClient } from "~/lib/auth-client";
 import { PROJECT_NAME } from "~/lib/project";
 import appCss from "../app.css?url";
 
@@ -59,11 +60,11 @@ function RootComponent() {
 	}
 
 	return (
-		<ConvexAuthProvider client={convex}>
+		<ConvexBetterAuthProvider client={convex} authClient={authClient}>
 			<RootDocument>
 				<Outlet />
 			</RootDocument>
-		</ConvexAuthProvider>
+		</ConvexBetterAuthProvider>
 	);
 }
 
