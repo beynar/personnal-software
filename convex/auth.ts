@@ -6,6 +6,7 @@ import {
 import { convex } from "@convex-dev/better-auth/plugins";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { type BetterAuthOptions, betterAuth } from "better-auth/minimal";
+import { organization } from "better-auth/plugins/organization";
 import { components, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
@@ -74,7 +75,12 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 			enabled: true,
 			requireEmailVerification: false,
 		},
-		plugins: [convex({ authConfig })],
+		plugins: [
+			convex({ authConfig }),
+			organization({
+				allowUserToCreateOrganization: true,
+			}),
+		],
 		hooks: {
 			before: createAuthMiddleware(async (ctx) => {
 				if (ctx.path !== "/sign-up/email") return;

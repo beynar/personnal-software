@@ -231,3 +231,35 @@
   - `createAuthMiddleware` from `better-auth/api` receives a context with `path`, `headers`, `body` — use `ctx.path` to match specific endpoints
   - `APIError` from `better-auth/api` accepts status code string ("FORBIDDEN") and options with `message` — this is the proper way to reject requests in hooks
   - The `@convex-dev/auth/react` package (`useAuthActions`) is no longer imported anywhere in the frontend after this migration
+
+## US-005: Reconnect current-user, profile, and file ownership to Better Auth
+- Verified all server-side user resolution in `convex/users.ts` and `convex/files.ts` uses `authComponent.safeGetAuthUser(ctx)` (migrated in US-001 Better Auth)
+- Verified sidebar identity in `app/routes/dashboard.tsx` and profile page in `app/routes/dashboard.profile.tsx` + `app/components/profile/profile-settings-page.tsx` correctly consume `api.users.viewer` query
+- Verified file ownership model: `files.userId` is `v.id("users")` in schema, `saveFile` stores `authUser.userId`, `deleteFile` checks ownership, `listFiles` filters by user
+- Verified profile image upload/remove flow chains through Better Auth: `generateUploadUrl` → `updateProfileImage` both check auth via `authComponent.safeGetAuthUser(ctx)`
+- Removed unused `@convex-dev/auth@^0.0.91` from `package.json` — no imports remain after US-002/US-004 migration
+- Updated `AGENTS.md` stack reference from `@convex-dev/auth` to `@convex-dev/better-auth`
+- Files changed: `package.json`, `package-lock.json`, `AGENTS.md`
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - `@convex-dev/better-auth` does NOT depend on `@convex-dev/auth` — the old package can be safely removed once all imports are migrated
+  - The Better Auth user lifecycle is: signup → `onCreate` trigger creates app user → `setUserId` links auth user to app user → `safeGetAuthUser` returns auth user with `userId` pointing to app user
+  - `authUser.userId` from `safeGetAuthUser` must be cast with `as unknown as Id<"users">` because the component's types don't know about the app's table types
+  - Profile image storage uses the same `generateUploadUrl` from `files.ts` — the auth check there is sufficient since it goes through Better Auth
+
+## US-006: Enable organization management with a minimal app surface
+- Added `organization()` plugin from `better-auth/plugins/organization` to the Better Auth server config in `convex/auth.ts` with `allowUserToCreateOrganization: true`
+- Added `organizationClient()` from `better-auth/client/plugins` to the client config in `app/lib/auth-client.ts`
+- Extended `convex/betterAuth/schema.ts` with 3 new tables: `organization` (name, slug, logo, metadata), `member` (organizationId, userId, role), `invitation` (organizationId, email, role, status, expiresAt, inviterId)
+- Added `activeOrganizationId` optional field to the existing `session` table in the component schema
+- Created `app/routes/dashboard.organizations.tsx` with create organization form and membership list UI using `authClient.useListOrganizations()` and `authClient.organization.create()`
+- Added Organizations link with Building2 icon to dashboard sidebar in `app/routes/dashboard.tsx`
+- Files changed: `convex/auth.ts`, `app/lib/auth-client.ts`, `convex/betterAuth/schema.ts`, `app/routes/dashboard.organizations.tsx` (new), `app/routes/dashboard.tsx`, `app/routeTree.gen.ts` (auto-generated)
+- All quality checks pass: `tsc --noEmit`, `biome check`, `vite build`
+- **Learnings for future iterations:**
+  - `organization()` from `better-auth/plugins/organization` is the server plugin; `organizationClient()` from `better-auth/client/plugins` is the client plugin — different import paths
+  - The organization plugin adds `activeOrganizationId` to the `session` table — must be added to the component schema manually
+  - The plugin adds 3 tables (organization, member, invitation) plus optional team/teamMember tables if `teams.enabled: true`
+  - Client methods: `authClient.useListOrganizations()` for reactive org list, `authClient.organization.create({ name, slug })` to create
+  - `authClient.organization.create()` returns `{ data, error }` — same pattern as other Better Auth client methods
+  - The organization plugin schema uses `metadata` as an optional string field (JSON-serialized) on the organization table

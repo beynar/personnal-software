@@ -7,7 +7,15 @@ import {
 	useNavigate,
 } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
-import { Home, Layers3, LogOut, Moon, Sun, UserRound } from "lucide-react";
+import {
+	Building2,
+	Home,
+	Layers3,
+	LogOut,
+	Moon,
+	Sun,
+	UserRound,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
@@ -33,6 +41,11 @@ import { api } from "../../convex/_generated/api";
 
 const dashboardLinks = [
 	{ to: "/dashboard", label: "Overview", icon: Home },
+	{
+		to: "/dashboard/organizations",
+		label: "Organizations",
+		icon: Building2,
+	},
 	{ to: "/dashboard/design-system", label: "Design System", icon: Layers3 },
 ] as const;
 
