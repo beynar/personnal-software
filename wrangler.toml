@@ -1,3 +1,52 @@
 name = "bubbly-dragon"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
+
+# =============================================================================
+# Cron Triggers (Scheduled Events)
+# =============================================================================
+# Uncomment to enable scheduled tasks. Each cron pattern invokes the Worker's
+# `scheduled` event handler (see app/worker/scheduled.ts).
+#
+# After uncommenting, deploy with `wrangler deploy`. Cron triggers only run
+# in production. To test locally:
+#   wrangler dev --test-scheduled
+#   curl "http://localhost:8787/__scheduled?cron=0+*+*+*+*"
+#
+# Cron syntax: minute hour day-of-month month day-of-week
+# Reference: https://developers.cloudflare.com/workers/configuration/cron-triggers/
+#
+# [triggers]
+# crons = [
+#   "0 * * * *",   # Every hour — session cleanup, cache refresh
+#   "0 0 * * *",   # Daily at midnight UTC — data archival, digest prep
+#   "0 9 * * 1",   # Every Monday 9am UTC — weekly report/digest
+#   # "*/5 * * * *", # Every 5 minutes — health checks (use sparingly)
+# ]
+
+# =============================================================================
+# Durable Objects
+# =============================================================================
+# Uncomment to enable Durable Objects. Each binding creates a namespace you can
+# access via env.BINDING_NAME in your Worker (see app/worker/rate-limiter.ts).
+#
+# After uncommenting, deploy with `wrangler deploy`. The migration runs
+# automatically on first deploy to register the DO class.
+#
+# Reference: https://developers.cloudflare.com/durable-objects/
+#
+# [[durable_objects.bindings]]
+# name = "RATE_LIMITER"               # env.RATE_LIMITER in your Worker
+# class_name = "RateLimiter"          # Must match the exported class name
+#
+# # Add more Durable Objects as needed:
+# # [[durable_objects.bindings]]
+# # name = "SESSION_STORE"
+# # class_name = "SessionStore"
+#
+# # Migrations tell Cloudflare which DO classes exist. Add a new migration
+# # entry (with a unique tag) each time you add or rename a DO class.
+# [[migrations]]
+# tag = "v1"                           # Unique tag — increment for each change
+# new_classes = ["RateLimiter"]        # Classes being created in this migration
+# # new_classes = ["RateLimiter", "SessionStore"]  # Add more classes here
