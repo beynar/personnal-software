@@ -104,6 +104,11 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 			}),
 			apiKey({
 				defaultPrefix: "bd_",
+				// API keys passed via the x-api-key header (default) create a
+				// mock session so that /get-session returns user + session for
+				// REST and MCP callers using the same credential type.
+				apiKeyHeaders: "x-api-key",
+				enableSessionForAPIKeys: true,
 				rateLimit: {
 					enabled: false,
 				},

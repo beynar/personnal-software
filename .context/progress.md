@@ -487,3 +487,33 @@
 - **Learnings for future iterations:**
   - TanStack Router's `<Link>` component type-checks the `to` prop against registered routes — use plain `<a>` for paths served by Hono or other non-router handlers
   - `DropdownMenuItem asChild` with `<a href="...">` works the same as with `<Link>` for menu items linking to non-router paths
+
+## US-006: Verify the integration path end to end
+- Ran `npm run lint` — 141 files checked, no issues
+- Ran `npm run typecheck` — clean, no errors
+- Ran `npm run build` — successful build in 7.83s (client + server environments)
+- Verified `/api/v1/openapi.json` route: chanfana serves the OpenAPI spec at this path via `fromHono()` in `app/lib/api.ts`
+- Verified `/api/v1/docs` route: Scalar API reference UI served via `apiReference()` Hono middleware loading spec from `/api/v1/openapi.json`
+- Verified `/api/v1/test` route: `TestEndpoint` class registered via `openapi.get("/test", TestEndpoint)` returning `{ success, message, timestamp }`
+- Verified dashboard account menu: `BookOpen` icon with "Docs" link to `/api/v1/docs` in the shared `AccountMenuItems` component, visible in both expanded and collapsed sidebar states
+- All routes served through TanStack Start splat route `app/routes/api.v1.$.ts` delegating to Hono's `app.fetch(request)`
+- No code changes required — all implementations from US-001 through US-005 are correct
+- Files changed: `.context/progress.md` (this file)
+- **Learnings for future iterations:**
+  - This verification story confirmed the full integration: Hono app mounted at `/api/v1` via TanStack Start splat route, chanfana generating OpenAPI spec, Scalar rendering docs, and dashboard menu linking to docs
+  - "use client" directive warnings during build are benign — Vite ignores module-level directives in bundled files but the components work correctly
+  - The build produces both client and server environments for Cloudflare Workers deployment
+
+## US-001: Enable API-key sessions and centralize auth validation
+- Added `enableSessionForAPIKeys: true` and explicit `apiKeyHeaders: "x-api-key"` to the `apiKey()` plugin config in `convex/auth.ts`, with inline comments documenting the header contract
+- Created `app/lib/api-auth.ts` as a shared auth helper exporting `validateApiKey(apiKey)` and `extractApiKey(request)` — validates API keys by calling Better Auth's `/get-session` endpoint with the `x-api-key` header
+- The helper returns a normalized `ApiAuthResult` with typed `user` and `session` objects, or `null` if invalid
+- No `verifyApiKey` + session lookup combination — relies solely on Better Auth's `get-session` endpoint which the API key plugin intercepts when `enableSessionForAPIKeys` is enabled
+- Files changed: `convex/auth.ts` (modified), `app/lib/api-auth.ts` (new)
+- All quality checks pass: `npm run lint` (142 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - `enableSessionForAPIKeys: true` on the `apiKey()` plugin causes the plugin to intercept `/get-session` requests that carry an `x-api-key` header and return a mock session with user data — no separate key verification step needed
+  - The default header is already `x-api-key` but setting `apiKeyHeaders: "x-api-key"` explicitly documents the contract
+  - The mock session returned has `id` set to the API key's ID and `token` set to the raw key value
+  - Better Auth warns this feature is "not recommended for production" in its type docs — suitable for developer/internal API use cases
+  - The shared helper at `app/lib/api-auth.ts` can be used by both REST API routes and MCP endpoints to validate API keys uniformly
