@@ -217,7 +217,7 @@ function AccountMenuItems({
 			<DropdownMenuItem asChild>
 				<a href="/api/v1/docs">
 					<BookOpen className="size-4" />
-					<span>Docs</span>
+					<span>API reference</span>
 				</a>
 			</DropdownMenuItem>
 			<DropdownMenuItem onSelect={onOpenApiKeys}>

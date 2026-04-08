@@ -140,6 +140,34 @@ If the page renders but buttons/forms do nothing, the client entry is broken. Ch
 
 If Convex websocket requests hit `//api/...`, the Convex URL normalization is wrong. Check `app/routes/__root.tsx`.
 
+### Machine access verification
+
+After creating an account, verify REST and MCP auth:
+
+1. Create an API key from the dashboard account menu → "API keys"
+2. Copy the raw key (shown once at creation time)
+3. Verify REST rejection without a key:
+   ```bash
+   curl http://localhost:8888/api/v1/test
+   # expect 401
+   ```
+4. Verify REST success with a key:
+   ```bash
+   curl -H "x-api-key: bd_your_key" http://localhost:8888/api/v1/test
+   # expect 200 with JSON
+   ```
+5. Verify API reference loads: open `http://localhost:8888/api/v1/docs`
+6. Verify MCP with API key:
+   ```bash
+   curl -X POST -H "x-api-key: bd_your_key" \
+     -H "Content-Type: application/json" \
+     -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' \
+     http://localhost:8888/api/mcp
+   # expect JSON-RPC response with tool list
+   ```
+
+The `execute` MCP tool proxies requests through the host process. Credentials are never exposed to sandboxed code — the host attaches the caller's API key or bearer token when dispatching the request to the REST API.
+
 ## 7. Cloudflare deployment with Wrangler CLI
 
 This section is mandatory for deployed environments.

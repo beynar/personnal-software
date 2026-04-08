@@ -90,6 +90,10 @@ apiApp.get(
 	apiReference({
 		url: "/api/v1/openapi.json",
 		theme: "kepler",
+		pageTitle: "Bubbly Dragon API Reference",
+		authentication: {
+			preferredSecurityScheme: "apiKey",
+		},
 	}),
 );
 

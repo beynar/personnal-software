@@ -579,3 +579,55 @@
   - `validateApiKey()` returns `ApiAuthResult` with Date objects for timestamps — must convert to strings when mapping to `McpSession`
   - The `credential` discriminated union on `McpSession` allows tool handlers to forward auth without knowing the auth mechanism — use `session.credential.type` to branch if needed
   - Bearer path uses `/api/auth/mcp/get-session` (MCP plugin endpoint) while API key path uses `/api/auth/get-session` (standard Better Auth endpoint intercepted by API key plugin) — different endpoints for different auth flows
+
+## US-006: Wire Cloudflare codemode runtime for sandboxed execution
+- Added `@cloudflare/codemode@^0.3.4` to project dependencies
+- Added `worker_loaders = [{ binding = "LOADER" }]` to `wrangler.toml` for the Dynamic Worker Loader binding
+- Created `app/lib/codemode.ts` exporting `getExecutor()` which returns a `DynamicWorkerExecutor` with `globalOutbound: null` (fully isolated — no network access, no auth secrets in sandbox)
+- The executor is accessible from any server-side code path (MCP route, Hono API routes, server functions) via `import { getExecutor } from "~/lib/codemode"`
+- Uses `import { env } from "cloudflare:workers"` to access the LOADER binding — the official Cloudflare pattern for TanStack Start on Workers
+- Files changed: `package.json`, `package-lock.json`, `wrangler.toml`, `app/lib/codemode.ts` (new)
+- All quality checks pass: `npm run lint` (144 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - `import { env } from "cloudflare:workers"` is the canonical way to access Worker bindings in TanStack Start — works in server functions, route handlers, and server entry
+  - `DynamicWorkerExecutor` requires a `loader` (WorkerLoader binding) — the type comes from the Cloudflare runtime, not from TS packages; use `any` cast with biome-ignore
+  - `globalOutbound: null` blocks all network access from the sandbox — tool calls dispatch back to the host via Workers RPC, keeping auth secrets out of the sandbox
+  - `@cloudflare/codemode` also provides `codeMcpServer()` and `openApiMcpServer()` from `@cloudflare/codemode/mcp` for wrapping MCP servers with a single `code` tool
+  - The `worker_loaders` binding in wrangler.toml is the only config needed — no migrations, no class names, no bucket names
+  - Biome's import sorting puts `cloudflare:workers` before `@cloudflare/codemode` — the `c` protocol prefix sorts before `@`
+
+## US-007: Add the MCP execute tool with host-side authenticated request proxying
+- Created `app/lib/mcp-openapi-tools.ts` as a dedicated module implementing the `execute` tool separately from transport code
+- The `executeApiRequest()` function proxies requests through `apiApp.fetch(...)` with credential forwarding — sandboxed code only needs to call the tool, never handles credentials directly
+- API-key credentials set the `x-api-key` header; bearer tokens set `Authorization` header but cannot authenticate against API-key-only REST routes — this limitation is surfaced via an `authNote` field in the response envelope when a 401 occurs
+- Response envelope includes: `status`, `contentType`, `headers` (filtered to safe set), `body` (parsed as JSON when possible), `truncated` (128 KB limit), and optional `authNote`
+- Registered `execute` tool in `app/lib/mcp-server.ts` via `registerTool()` with full input schema (method, path, headers, body)
+- Made `handleMcpRequest()` async and `ToolHandler` type accept `Promise<ToolResult>` to support the async `execute` tool
+- Updated `app/routes/api.mcp.ts` to `await` the now-async `handleMcpRequest()`, using `Promise.all()` for batch requests
+- Paths without `/api/v1` prefix are auto-prefixed for convenience
+- Files changed: `app/lib/mcp-openapi-tools.ts` (new), `app/lib/mcp-server.ts` (modified), `app/routes/api.mcp.ts` (modified)
+- All quality checks pass: `npm run lint` (145 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - `apiApp.fetch(request)` works with synthetic URLs (`http://localhost/api/v1/...`) — Hono only inspects pathname for routing
+  - Making `ToolHandler` return `ToolResult | Promise<ToolResult>` allows both sync and async tools in the same registry without changing existing sync handlers
+  - The `ALLOWED_HEADERS` set controls which response headers are exposed in the envelope — keeps the surface small and safe
+  - Bearer tokens from MCP OAuth sessions cannot authenticate against the Hono API-key middleware — this is an expected limitation documented in the `authNote` field rather than hidden
+  - Biome's formatter collapses short ternaries to single lines — avoid multi-line ternaries for expressions under the print width
+
+## US-008: Update dashboard and docs for the new REST and MCP auth contract
+- Updated dashboard account menu "Docs" label to "API reference" for clearer product language
+- Updated Scalar API reference config in `app/lib/api.ts` to pre-select the `apiKey` security scheme in the authentication panel, so users see the right auth method immediately
+- Rewrote `README.md` "MCP Auth Support (Provisional)" section into a comprehensive "Machine Access (REST and MCP)" section covering:
+  - REST API authentication with `x-api-key` header and public spec/docs paths
+  - MCP server dual authentication (bearer token via OAuth, or `x-api-key` for direct access)
+  - MCP tools table (get-profile, search-routes, execute)
+  - Host-side request proxying explanation — credentials never enter sandboxed code
+  - Full verification checklist covering all acceptance criteria scenarios
+- Updated `BOOTSTRAP.md` with a "Machine access verification" subsection under the local verification checklist, with concrete curl commands for verifying REST rejection/success, API reference, and MCP with API key
+- Files changed: `app/routes/dashboard.tsx`, `app/lib/api.ts`, `README.md`, `BOOTSTRAP.md`
+- All quality checks pass: `npm run lint` (145 files, no issues), `npm run typecheck` (clean), `npm run build` (successful, 8.70s)
+- **Learnings for future iterations:**
+  - Scalar v0.10.x `authentication` config uses `preferredSecurityScheme` (string matching a securityScheme name from the OpenAPI spec) — not `apiKey.token`
+  - `AuthenticationConfiguration` type comes from `@scalar/types` and supports `preferredSecurityScheme`, `securitySchemes` (overrides), and `createAnySecurityScheme`
+  - The `pageTitle` option in `apiReference()` sets the browser tab title for the docs page
+  - TanStack Router's `<Link>` rejects non-registered paths — use plain `<a>` for Hono-served routes like `/api/v1/docs`

@@ -140,9 +140,35 @@ Cloudflare scheduled event handler with example patterns for hourly cleanup, dai
 
 Sliding-window rate limiter implemented as a Cloudflare Durable Object with alarm-based cleanup. Enable by uncommenting the Durable Objects bindings in `wrangler.toml`.
 
-## MCP Auth Support (Provisional)
+## Machine Access (REST and MCP)
 
-This repo includes Better Auth's `mcp` plugin, which enables MCP clients to authenticate via OAuth 2.0 discovery and token endpoints. The plugin exposes:
+This repo exposes two machine interfaces: a REST API and an MCP server. Both require authentication.
+
+### REST API (`/api/v1/*`)
+
+All REST endpoints require the `x-api-key` header. Create an API key from the dashboard account menu.
+
+```bash
+curl -H "x-api-key: bd_your_key_here" https://your-app.example.com/api/v1/test
+```
+
+The OpenAPI spec and interactive API reference are publicly accessible without a key:
+
+- `GET /api/v1/openapi.json` — machine-readable OpenAPI 3.1 spec
+- `GET /api/v1/docs` — interactive API reference (Scalar)
+
+To make authenticated requests from the API reference page, paste your API key into the authentication panel.
+
+### MCP server (`/api/mcp`)
+
+The MCP server accepts two authentication methods:
+
+| Method | Header | Use case |
+|--------|--------|----------|
+| Bearer token | `Authorization: Bearer <token>` | OAuth 2.0 flow — MCP clients that complete the authorization dance |
+| API key | `x-api-key: bd_your_key_here` | Direct access — scripts, CI, or MCP clients that skip OAuth |
+
+MCP discovery endpoints (served by Better Auth's `mcp` plugin):
 
 - `/.well-known/oauth-authorization-server` — OAuth discovery metadata
 - `/.well-known/oauth-protected-resource` — protected resource metadata
@@ -150,7 +176,39 @@ This repo includes Better Auth's `mcp` plugin, which enables MCP clients to auth
 - `/mcp/token` — token endpoint
 - `/mcp/register` — dynamic client registration
 
-**This plugin is provisional.** Better Auth marks the `mcp` plugin as heading toward deprecation in favor of the `oidc-provider` (OAuth Provider) plugin. The current integration works for MCP authentication today, but plan to migrate to the OAuth Provider plugin when it stabilizes. See the [Better Auth OIDC Provider docs](https://www.better-auth.com/docs/plugins/oidc-provider) for the future direction.
+**Note:** Better Auth marks the `mcp` plugin as heading toward deprecation in favor of the `oidc-provider` (OAuth Provider) plugin. The current integration works today, but plan to migrate when the OAuth Provider plugin stabilizes.
+
+### MCP tools
+
+The MCP server exposes three tools:
+
+| Tool | Description |
+|------|-------------|
+| `get-profile` | Returns the authenticated user's profile |
+| `search-routes` | Searches the OpenAPI route catalog by keyword |
+| `execute` | Executes an API request against the REST API |
+
+### Host-side request proxying
+
+The `execute` tool uses host-side request proxying rather than exposing credentials inside sandboxed code. When a tool call arrives, the MCP server constructs and dispatches the HTTP request on the host using the caller's credentials. The sandboxed environment never receives API keys or tokens — it only describes what request to make and receives the response envelope.
+
+This means:
+
+- Sandboxed code cannot leak or misuse credentials
+- API-key callers get their key forwarded to the REST API automatically
+- Bearer-token callers can call any MCP tool but may receive a `401` from API-key-only REST endpoints (this is surfaced via an `authNote` field in the response)
+
+### Verification checklist
+
+After setting up auth and API keys, verify the following:
+
+- [ ] **Unauthenticated REST rejection**: `curl https://your-app.example.com/api/v1/test` returns `401`
+- [ ] **Authenticated REST success**: `curl -H "x-api-key: bd_..." https://your-app.example.com/api/v1/test` returns `200`
+- [ ] **Protected OpenAPI behavior**: `GET /api/v1/docs` loads the API reference without a key; making a request from the docs UI without a key shows a `401`
+- [ ] **Bearer MCP success**: An MCP client that completed the OAuth flow can call `tools/list` and `tools/call` on `/api/mcp`
+- [ ] **API-key MCP success**: `curl -X POST -H "x-api-key: bd_..." -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' https://your-app.example.com/api/mcp` returns the tool list
+- [ ] **search-routes tool**: Calling `search-routes` with `{"query":"test"}` returns the `/api/v1/test` endpoint
+- [ ] **execute tool**: Calling `execute` with `{"method":"GET","path":"/test"}` returns the test endpoint response
 
 ## Available Scripts
 
