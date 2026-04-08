@@ -9,7 +9,9 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import {
 	Building2,
+	ChevronsUpDown,
 	Home,
+	Key,
 	Layers3,
 	LogOut,
 	Moon,
@@ -21,6 +23,13 @@ import { ApiKeyDrawer } from "~/components/api-keys/api-key-drawer";
 import { OrganizationSwitcher } from "~/components/organizations/organization-switcher";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import {
 	Sidebar,
 	SidebarContent,
@@ -136,6 +145,8 @@ function SessionFooter({
 		| undefined;
 	onSignOut: () => Promise<void>;
 }) {
+	const [apiKeyDrawerOpen, setApiKeyDrawerOpen] = useState(false);
+
 	if (user === undefined) {
 		return <SessionFooterSkeleton />;
 	}
@@ -143,61 +154,80 @@ function SessionFooter({
 	const userLabel = user?.name ?? user?.email ?? "Signed in";
 
 	return (
-		<div className="rounded-xl border border-border/70 bg-background/80 p-3">
-			<div className="flex items-center gap-3">
-				<Avatar className="size-10 border border-border/70" size="lg">
-					<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
-					<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
-				</Avatar>
-				<div className="min-w-0">
-					<p className="truncate text-sm font-medium">{userLabel}</p>
-					<p className="truncate text-xs text-muted-foreground">
-						{user?.email ?? "Account"}
-					</p>
-				</div>
+		<>
+			<ApiKeyDrawer
+				onOpenChange={setApiKeyDrawerOpen}
+				open={apiKeyDrawerOpen}
+				showTrigger={false}
+			/>
+			<div className="rounded-xl border border-border/70 bg-background/80 p-2">
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button
+							className="h-auto w-full justify-between rounded-lg px-2 py-2.5"
+							variant="ghost"
+						>
+							<div className="flex min-w-0 items-center gap-3 text-left">
+								<Avatar className="size-10 border border-border/70" size="lg">
+									<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
+									<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
+								</Avatar>
+								<div className="min-w-0">
+									<p className="truncate text-sm font-medium">{userLabel}</p>
+									<p className="truncate text-xs text-muted-foreground">
+										{user?.email ?? "Account"}
+									</p>
+								</div>
+							</div>
+							<ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="w-56" side="right">
+						<DropdownMenuItem onSelect={() => setApiKeyDrawerOpen(true)}>
+							<Key className="size-4" />
+							<span>API keys</span>
+						</DropdownMenuItem>
+						{activeOrganization ? (
+							<DropdownMenuItem asChild>
+								<Link to="/dashboard/organization-settings">
+									<Building2 className="size-4" />
+									<span>Organization settings</span>
+								</Link>
+							</DropdownMenuItem>
+						) : null}
+						<DropdownMenuItem asChild>
+							<Link to="/dashboard/profile">
+								<UserRound className="size-4" />
+								<span>Profile</span>
+							</Link>
+						</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem
+							onSelect={() => void onSignOut()}
+							variant="destructive"
+						>
+							<LogOut className="size-4" />
+							<span>Sign out</span>
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
-			{activeOrganization ? (
-				<Button asChild className="mt-3 w-full justify-start" variant="outline">
-					<Link to="/dashboard/organization-settings">
-						<Building2 className="size-4" />
-						<span>Organization settings</span>
-					</Link>
-				</Button>
-			) : null}
-			<div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-				<Button
-					className="size-9 p-0"
-					onClick={onSignOut}
-					type="button"
-					variant="outline"
-				>
-					<LogOut className="size-4" />
-					<span className="sr-only">Sign out</span>
-				</Button>
-				<Button asChild className="justify-start" variant="outline">
-					<Link to="/dashboard/profile">
-						<UserRound className="size-4" />
-						<span>Profile</span>
-					</Link>
-				</Button>
-			</div>
-		</div>
+		</>
 	);
 }
 
 function SessionFooterSkeleton() {
 	return (
-		<div className="rounded-xl border border-border/70 bg-background/80 p-3">
-			<div className="flex items-center gap-3">
-				<Skeleton className="size-10 shrink-0 rounded-full" />
-				<div className="min-w-0 flex-1 space-y-2">
-					<Skeleton className="h-4 w-28 rounded-md" />
-					<Skeleton className="h-3 w-36 rounded-md" />
+		<div className="rounded-xl border border-border/70 bg-background/80 p-2">
+			<div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5">
+				<div className="flex min-w-0 items-center gap-3">
+					<Skeleton className="size-10 shrink-0 rounded-full" />
+					<div className="min-w-0 flex-1 space-y-2">
+						<Skeleton className="h-4 w-28 rounded-md" />
+						<Skeleton className="h-3 w-36 rounded-md" />
+					</div>
 				</div>
-			</div>
-			<div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-				<Skeleton className="size-9 rounded-md" />
-				<Skeleton className="h-9 w-full rounded-md" />
+				<Skeleton className="size-4 shrink-0 rounded-sm" />
 			</div>
 		</div>
 	);
@@ -219,56 +249,71 @@ function DashboardSidebarFooter({
 }) {
 	const { data: activeOrganization } = authClient.useActiveOrganization();
 	const { isCollapsed, isMobile } = useSidebar();
+	const [apiKeyDrawerOpen, setApiKeyDrawerOpen] = useState(false);
+	const userLabel = user?.name ?? user?.email ?? "Signed in";
 
 	if (isCollapsed && !isMobile) {
 		return (
 			<SidebarFooter className="p-0">
-				<ApiKeyDrawer collapsed />
+				<ApiKeyDrawer
+					onOpenChange={setApiKeyDrawerOpen}
+					open={apiKeyDrawerOpen}
+					showTrigger={false}
+				/>
 				<ThemeToggle
 					className="m-0 h-16 w-full rounded-none border-b border-border-70"
 					size="icon"
 					variant="ghost"
 				/>
-				{activeOrganization ? (
-					<Button
-						asChild
-						className="m-0 h-16 w-full rounded-none border-b border-border-70"
-						size="icon"
-						variant="ghost"
-					>
-						<Link to="/dashboard/organization-settings">
-							<Building2 className="size-5" />
-							<span className="sr-only">Organization settings</span>
-						</Link>
-					</Button>
-				) : null}
-				<Button
-					asChild
-					className="m-0 h-16 w-full rounded-none border-b border-border-70"
-					size="icon"
-					variant="ghost"
-				>
-					<Link to="/dashboard/profile">
-						<UserRound className="size-5" />
-						<span className="sr-only">Profile</span>
-					</Link>
-				</Button>
-				<Button
-					className="m-0 h-16 w-full rounded-none border-0"
-					onClick={onSignOut}
-					size="icon"
-					variant="ghost"
-				>
-					<LogOut className="size-5" />
-					<span className="sr-only">Sign out</span>
-				</Button>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button
+							className="m-0 h-16 w-full rounded-none border-0"
+							size="icon"
+							variant="ghost"
+						>
+							<Avatar className="size-9 border border-border/70" size="lg">
+								<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
+								<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
+							</Avatar>
+							<span className="sr-only">Open account menu</span>
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" side="right">
+						<DropdownMenuItem onSelect={() => setApiKeyDrawerOpen(true)}>
+							<Key className="size-4" />
+							<span>API keys</span>
+						</DropdownMenuItem>
+						{activeOrganization ? (
+							<DropdownMenuItem asChild>
+								<Link to="/dashboard/organization-settings">
+									<Building2 className="size-4" />
+									<span>Organization settings</span>
+								</Link>
+							</DropdownMenuItem>
+						) : null}
+						<DropdownMenuItem asChild>
+							<Link to="/dashboard/profile">
+								<UserRound className="size-4" />
+								<span>Profile</span>
+							</Link>
+						</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem
+							onSelect={() => void onSignOut()}
+							variant="destructive"
+						>
+							<LogOut className="size-4" />
+							<span>Sign out</span>
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</SidebarFooter>
 		);
 	}
 
 	return (
 		<SidebarFooter className="gap-4 flex flex-col">
-			<ApiKeyDrawer />
 			<ThemeToggle />
 			<SessionFooter
 				activeOrganization={activeOrganization}
