@@ -16,6 +16,18 @@ import authConfig from "./auth.config";
 import betterAuthSchema from "./betterAuth/schema";
 
 const siteUrl = process.env.SITE_URL ?? "http://localhost:8888";
+const trustedOrigins = (() => {
+	const origins = [siteUrl];
+
+	try {
+		const { hostname } = new URL(siteUrl);
+		if (hostname === "localhost" || hostname === "127.0.0.1") {
+			origins.push("http://localhost:*", "http://127.0.0.1:*");
+		}
+	} catch {}
+
+	return Array.from(new Set(origins));
+})();
 
 // biome-ignore lint/suspicious/noExplicitAny: AuthFunctions type resolved after npx convex dev
 const authFunctions: AuthFunctions = internal.auth as any;
@@ -36,6 +48,7 @@ export const authComponent = createClient<DataModel, typeof betterAuthSchema>(
 				onCreate: async (ctx, authUser) => {
 					const userId = await ctx.db.insert("users", {
 						email: authUser.email,
+						name: authUser.name,
 					});
 					await authComponent.setUserId(
 						ctx,
@@ -44,9 +57,15 @@ export const authComponent = createClient<DataModel, typeof betterAuthSchema>(
 					);
 				},
 				onUpdate: async (ctx, newUser, oldUser) => {
-					if (oldUser.email === newUser.email) return;
+					if (
+						oldUser.email === newUser.email &&
+						oldUser.name === newUser.name
+					) {
+						return;
+					}
 					await ctx.db.patch(newUser.userId as unknown as Id<"users">, {
 						email: newUser.email,
+						name: newUser.name,
 					});
 				},
 				onDelete: async (ctx, authUser) => {
@@ -72,6 +91,7 @@ export const { getAuthUser } = authComponent.clientApi();
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 	({
 		baseURL: siteUrl,
+		trustedOrigins,
 		database: authComponent.adapter(ctx),
 		emailAndPassword: {
 			enabled: true,
@@ -84,6 +104,9 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 			}),
 			apiKey({
 				defaultPrefix: "bd_",
+				rateLimit: {
+					enabled: false,
+				},
 			}),
 			mcp({
 				loginPage: "/sign-in",

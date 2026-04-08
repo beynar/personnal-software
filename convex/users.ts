@@ -19,7 +19,12 @@ export const viewer = query({
 			? await ctx.storage.getUrl(user.imageStorageId)
 			: user.image;
 
-		return { ...user, image };
+		return {
+			...user,
+			email: user.email ?? authUser.email,
+			image,
+			name: user.name ?? authUser.name,
+		};
 	},
 });
 
@@ -54,6 +59,36 @@ export const updateProfile = mutation({
 		}
 
 		await ctx.db.patch(userId, { bio, name, username });
+		return null;
+	},
+});
+
+/**
+ * Backfills app-side profile fields from the Better Auth user record for
+ * accounts created before profile sync was wired correctly.
+ */
+export const syncViewerProfile = mutation({
+	args: {},
+	handler: async (ctx) => {
+		const authUser = await authComponent.safeGetAuthUser(ctx);
+		if (!authUser?.userId) throw new Error("Not authenticated");
+
+		const userId = authUser.userId as unknown as Id<"users">;
+		const user = await ctx.db.get(userId);
+		if (!user) throw new Error("User not found");
+
+		const patch: { email?: string; name?: string } = {};
+		if (!user.email && authUser.email) {
+			patch.email = authUser.email;
+		}
+		if (!user.name && authUser.name) {
+			patch.name = authUser.name;
+		}
+		if (Object.keys(patch).length === 0) {
+			return null;
+		}
+
+		await ctx.db.patch(userId, patch);
 		return null;
 	},
 });

@@ -6,11 +6,10 @@ import {
 	useLocation,
 	useNavigate,
 } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
 	Building2,
 	Home,
-	Key,
 	Layers3,
 	LogOut,
 	Moon,
@@ -18,6 +17,8 @@ import {
 	UserRound,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ApiKeyDrawer } from "~/components/api-keys/api-key-drawer";
+import { OrganizationSwitcher } from "~/components/organizations/organization-switcher";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
@@ -37,17 +38,10 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { authClient } from "~/lib/auth-client";
 import { checkBetterAuthSession } from "~/lib/auth.functions";
-import { PROJECT_INITIALS, PROJECT_NAME } from "~/lib/project";
 import { api } from "../../convex/_generated/api";
 
 const dashboardLinks = [
 	{ to: "/dashboard", label: "Overview", icon: Home },
-	{
-		to: "/dashboard/organizations",
-		label: "Organizations",
-		icon: Building2,
-	},
-	{ to: "/dashboard/api-keys", label: "API Keys", icon: Key },
 	{ to: "/dashboard/design-system", label: "Design System", icon: Layers3 },
 ] as const;
 
@@ -67,8 +61,14 @@ function DashboardLayoutRoute() {
 
 function DashboardShell() {
 	const user = useQuery(api.users.viewer);
+	const syncViewerProfile = useMutation(api.users.syncViewerProfile);
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
+
+	useEffect(() => {
+		if (!user?._id) return;
+		void syncViewerProfile();
+	}, [syncViewerProfile, user?._id]);
 
 	async function handleSignOut() {
 		await authClient.signOut();
@@ -78,8 +78,8 @@ function DashboardShell() {
 	return (
 		<SidebarProvider className="min-h-screen">
 			<Sidebar>
-				<SidebarHeader className="px-4 py-4 sm:px-6">
-					<BrandBlock />
+				<SidebarHeader className="px-4 py-3 sm:px-3">
+					<OrganizationSwitcher />
 				</SidebarHeader>
 				<SidebarContent>
 					<SidebarMenu>
@@ -120,20 +120,12 @@ function DashboardShell() {
 	);
 }
 
-function BrandBlock() {
-	const { isCollapsed, isMobile } = useSidebar();
-
-	return (
-		<p className="truncate text-sm font-semibold tracking-tight text-sidebar-accent-foreground">
-			{isCollapsed && !isMobile ? PROJECT_INITIALS : PROJECT_NAME}
-		</p>
-	);
-}
-
 function SessionFooter({
+	activeOrganization,
 	user,
 	onSignOut,
 }: {
+	activeOrganization: { id: string } | null | undefined;
 	user:
 		| {
 				email?: string;
@@ -164,6 +156,14 @@ function SessionFooter({
 					</p>
 				</div>
 			</div>
+			{activeOrganization ? (
+				<Button asChild className="mt-3 w-full justify-start" variant="outline">
+					<Link to="/dashboard/organization-settings">
+						<Building2 className="size-4" />
+						<span>Organization settings</span>
+					</Link>
+				</Button>
+			) : null}
 			<div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-2">
 				<Button
 					className="size-9 p-0"
@@ -217,16 +217,31 @@ function DashboardSidebarFooter({
 		| undefined;
 	onSignOut: () => Promise<void>;
 }) {
+	const { data: activeOrganization } = authClient.useActiveOrganization();
 	const { isCollapsed, isMobile } = useSidebar();
 
 	if (isCollapsed && !isMobile) {
 		return (
 			<SidebarFooter className="p-0">
+				<ApiKeyDrawer collapsed />
 				<ThemeToggle
 					className="m-0 h-16 w-full rounded-none border-b border-border-70"
 					size="icon"
 					variant="ghost"
 				/>
+				{activeOrganization ? (
+					<Button
+						asChild
+						className="m-0 h-16 w-full rounded-none border-b border-border-70"
+						size="icon"
+						variant="ghost"
+					>
+						<Link to="/dashboard/organization-settings">
+							<Building2 className="size-5" />
+							<span className="sr-only">Organization settings</span>
+						</Link>
+					</Button>
+				) : null}
 				<Button
 					asChild
 					className="m-0 h-16 w-full rounded-none border-b border-border-70"
@@ -253,8 +268,13 @@ function DashboardSidebarFooter({
 
 	return (
 		<SidebarFooter className="gap-4 flex flex-col">
+			<ApiKeyDrawer />
 			<ThemeToggle />
-			<SessionFooter onSignOut={onSignOut} user={user} />
+			<SessionFooter
+				activeOrganization={activeOrganization}
+				onSignOut={onSignOut}
+				user={user}
+			/>
 		</SidebarFooter>
 	);
 }
