@@ -517,3 +517,34 @@
   - The mock session returned has `id` set to the API key's ID and `token` set to the raw key value
   - Better Auth warns this feature is "not recommended for production" in its type docs — suitable for developer/internal API use cases
   - The shared helper at `app/lib/api-auth.ts` can be used by both REST API routes and MCP endpoints to validate API keys uniformly
+
+## US-002: Protect the Hono API and export the in-memory OpenAPI spec
+- Renamed `app` export to `apiApp` in `app/lib/api.ts` for a stable, unambiguous export name
+- Added `getOpenApiSpec()` export that returns the generated OpenAPI spec as a plain JS object via chanfana's `getGeneratedSchema()`
+- Added Hono `use("*")` middleware that enforces API-key auth on all `/api/v1/*` routes, exempting `/api/v1/openapi.json` and `/api/v1/docs` so the spec and docs remain publicly discoverable
+- Unauthenticated requests to protected routes receive `401 { error: "Missing x-api-key header" }` or `401 { error: "Invalid or expired API key" }`
+- Authenticated user/session are stashed in Hono context via `c.set()` for downstream handlers
+- Added `security` and `components.securitySchemes` to the OpenAPI schema so the spec documents the `x-api-key` auth requirement
+- Updated `app/routes/api.v1.$.ts` to import `apiApp` instead of `app`
+- Files changed: `app/lib/api.ts` (modified), `app/routes/api.v1.$.ts` (modified)
+- All quality checks pass: `npm run lint` (142 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - chanfana's `fromHono()` returns a proxy type (`HonoOpenAPIRouterType`) that doesn't expose `getGeneratedSchema()` — must cast via `as any` to access it
+  - chanfana's `schema` option type (`Partial<OpenAPIObjectConfigV31>`) doesn't include `security` or `components` — use `as any` cast on the schema object
+  - biome-ignore comments must be on the line directly above (or on) the violation — placing them earlier causes "unused suppression" errors
+  - Hono middleware `c.set()` requires `as never` casts when the Hono app uses default `BlankEnv` (no typed variables) — this is fine for a loosely-typed context bag
+  - Public paths in the middleware are checked via `new URL(c.req.url).pathname` since `c.req.path` may include the basePath differently across Hono versions
+
+## US-003: Build a lean searchable OpenAPI route catalog
+- Created `app/lib/openapi-catalog.ts` with `buildCatalog()` and `searchCatalog(query)` exports
+- `buildCatalog()` reads the in-memory OpenAPI spec via `getOpenApiSpec()` (no HTTP fetch) and produces `CatalogEntry[]` with: method, path, summary, description, tags, parameters, requestBodyContentTypes, responseContentTypes, schemaSummary
+- `searchCatalog(query)` filters and ranks catalog entries by keyword match against path (3), summary (2), tags (2), description (1)
+- Schema summaries are shallow: `object{key1, key2}` or `array<string>` — no recursive expansion
+- The `/test` endpoint appears in the derived catalog with its metadata (summary, description, response schema summary)
+- Minimal internal OpenAPI type stubs avoid importing full `openapi-types` package
+- Files changed: `app/lib/openapi-catalog.ts` (new), `.context/progress.md`
+- All quality checks pass: `npm run lint` (143 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - `getOpenApiSpec()` returns a plain JS object with standard OpenAPI 3.1 structure — can be cast to minimal type stubs for type-safe traversal
+  - chanfana populates the spec eagerly when routes are registered — `buildCatalog()` works synchronously at any point after module initialization
+  - Shallow schema summaries (`object{fields}`, `array<type>`) are sufficient for MCP tool discovery — full schema expansion would bloat catalog entries without adding search value
