@@ -4,7 +4,11 @@
  * Implements JSON-RPC 2.0 dispatch for the MCP protocol without the
  * @modelcontextprotocol/sdk dependency, which requires Node.js HTTP
  * primitives incompatible with Cloudflare Workers.
+ *
+ * Tools are registered via `registerTool()` — no hard-coded branches.
  */
+
+import { searchCatalog } from "~/lib/openapi-catalog";
 
 const SERVER_INFO = {
 	name: "bubbly-dragon",
@@ -39,20 +43,51 @@ type JsonRpcRequest = {
 	id?: string | number | null;
 };
 
-const TOOLS = [
+type ToolResult = {
+	content: { type: string; text: string }[];
+};
+
+type ToolDefinition = {
+	name: string;
+	description: string;
+	inputSchema: {
+		type: "object";
+		properties: Record<string, unknown>;
+		required?: string[];
+	};
+};
+
+type ToolHandler = (
+	params: Record<string, unknown>,
+	session: McpSession,
+) => ToolResult;
+
+type RegisteredTool = {
+	definition: ToolDefinition;
+	handler: ToolHandler;
+};
+
+/** Tool registry — keyed by tool name. */
+const toolRegistry = new Map<string, RegisteredTool>();
+
+/** Register an MCP tool with its definition and handler. */
+function registerTool(definition: ToolDefinition, handler: ToolHandler): void {
+	toolRegistry.set(definition.name, { definition, handler });
+}
+
+// ---- Built-in tools ----
+
+registerTool(
 	{
 		name: "get-profile",
 		description:
 			"Returns the authenticated user's profile information including email, name, and account creation date.",
 		inputSchema: {
-			type: "object" as const,
+			type: "object",
 			properties: {},
 		},
 	},
-];
-
-function handleGetProfile(session: McpSession) {
-	return {
+	(_params, session) => ({
 		content: [
 			{
 				type: "text",
@@ -68,8 +103,41 @@ function handleGetProfile(session: McpSession) {
 				),
 			},
 		],
-	};
-}
+	}),
+);
+
+registerTool(
+	{
+		name: "search-routes",
+		description:
+			"Search the API route catalog by keyword. Returns matching routes with method, path, summary, and schema information.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				query: {
+					type: "string",
+					description:
+						"Keyword to search for in route paths, summaries, descriptions, and tags.",
+				},
+			},
+			required: ["query"],
+		},
+	},
+	(params) => {
+		const query = (params.query as string) ?? "";
+		const results = searchCatalog(query);
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(results, null, 2),
+				},
+			],
+		};
+	},
+);
+
+// ---- JSON-RPC helpers ----
 
 function jsonRpcError(
 	id: string | number | null,
@@ -109,13 +177,18 @@ export function handleMcpRequest(
 		case "ping":
 			return jsonRpcResult(request.id ?? null, {});
 
-		case "tools/list":
-			return jsonRpcResult(request.id ?? null, { tools: TOOLS });
+		case "tools/list": {
+			const tools = [...toolRegistry.values()].map((t) => t.definition);
+			return jsonRpcResult(request.id ?? null, { tools });
+		}
 
 		case "tools/call": {
 			const toolName = request.params?.name as string | undefined;
-			if (toolName === "get-profile") {
-				return jsonRpcResult(request.id ?? null, handleGetProfile(session));
+			const tool = toolName ? toolRegistry.get(toolName) : undefined;
+			if (tool) {
+				const args =
+					(request.params?.arguments as Record<string, unknown>) ?? {};
+				return jsonRpcResult(request.id ?? null, tool.handler(args, session));
 			}
 			return jsonRpcError(
 				request.id ?? null,
