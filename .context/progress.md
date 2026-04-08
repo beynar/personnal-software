@@ -461,3 +461,29 @@
   - The `handle()` method can return a plain object — chanfana auto-serializes it to a JSON `Response`
   - `zod@4.3.6` is installed as a transitive dependency of chanfana — import `{ z }` from `"zod"` directly
   - Chanfana automatically includes registered endpoints in the generated OpenAPI spec at the configured `openapi_url`
+
+## US-004: Serve interactive API docs with Scalar
+- All acceptance criteria already met by prior stories (US-002 and US-003):
+  - `GET /api/v1/docs` renders the Scalar API reference UI via `apiReference()` middleware in `app/lib/api.ts:52-58`
+  - Docs page is configured to load the spec from `/api/v1/openapi.json` via the `url` parameter
+  - Served through TanStack Start splat route `app/routes/api.v1.$.ts` — no changes to the dashboard shell, no interference with existing `/api/auth/*` or `/api/mcp` routes
+- Verified all quality checks pass: `npm run lint` (141 files, no issues), `npm run typecheck` (clean), `npm run build` (successful, 8.05s)
+- No code changes required — implementation was complete from US-002/US-003
+- Files changed: `.context/progress.md` (this file)
+- **Learnings for future iterations:**
+  - `@scalar/hono-api-reference` v0.10.x uses `url` property (not `spec.url`) for the OpenAPI spec URL
+  - The `theme: "kepler"` option gives a clean dark-mode-friendly Scalar UI
+  - Scalar docs are served as a Hono middleware on a specific path — they don't require any separate HTML page or static assets
+  - The splat route (`api.v1.$.ts`) catches all sub-paths under `/api/v1/`, including `/api/v1/docs` and `/api/v1/openapi.json`
+
+## US-005: Add a docs entry to the dashboard account menu
+- Added a "Docs" link to the shared `AccountMenuItems` component in `app/routes/dashboard.tsx` that links to `/api/v1/docs`
+- Used `BookOpen` icon from lucide-react for the docs entry
+- The new item appears in both expanded and collapsed sidebar account menus because both use the shared `AccountMenuItems` component
+- Used a plain `<a>` tag instead of TanStack Router `<Link>` because `/api/v1/docs` is a Hono-served route (Scalar API reference), not a TanStack Router route — `Link`'s type system rejects non-registered paths
+- All existing account actions (API keys, Copy MCP URL, Organization settings, Profile, Sign out) remain unchanged
+- Files changed: `app/routes/dashboard.tsx` (modified)
+- All quality checks pass: `npm run lint` (141 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - TanStack Router's `<Link>` component type-checks the `to` prop against registered routes — use plain `<a>` for paths served by Hono or other non-router handlers
+  - `DropdownMenuItem asChild` with `<a href="...">` works the same as with `<Link>` for menu items linking to non-router paths

@@ -8,8 +8,10 @@ import {
 } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import {
+	BookOpen,
 	Building2,
 	ChevronsUpDown,
+	Copy,
 	Home,
 	Key,
 	Layers3,
@@ -19,6 +21,7 @@ import {
 	UserRound,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { ApiKeyDrawer } from "~/components/api-keys/api-key-drawer";
 import { OrganizationSwitcher } from "~/components/organizations/organization-switcher";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -131,10 +134,12 @@ function DashboardShell() {
 
 function SessionFooter({
 	activeOrganization,
-	user,
+	onCopyMcpUrl,
 	onSignOut,
+	user,
 }: {
 	activeOrganization: { id: string } | null | undefined;
+	onCopyMcpUrl: () => Promise<void>;
 	user:
 		| {
 				email?: string;
@@ -183,35 +188,65 @@ function SessionFooter({
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start" className="w-56" side="right">
-						<DropdownMenuItem onSelect={() => setApiKeyDrawerOpen(true)}>
-							<Key className="size-4" />
-							<span>API keys</span>
-						</DropdownMenuItem>
-						{activeOrganization ? (
-							<DropdownMenuItem asChild>
-								<Link to="/dashboard/organization-settings">
-									<Building2 className="size-4" />
-									<span>Organization settings</span>
-								</Link>
-							</DropdownMenuItem>
-						) : null}
-						<DropdownMenuItem asChild>
-							<Link to="/dashboard/profile">
-								<UserRound className="size-4" />
-								<span>Profile</span>
-							</Link>
-						</DropdownMenuItem>
-						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							onSelect={() => void onSignOut()}
-							variant="destructive"
-						>
-							<LogOut className="size-4" />
-							<span>Sign out</span>
-						</DropdownMenuItem>
+						<AccountMenuItems
+							activeOrganization={activeOrganization}
+							onCopyMcpUrl={onCopyMcpUrl}
+							onOpenApiKeys={() => setApiKeyDrawerOpen(true)}
+							onSignOut={onSignOut}
+						/>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
+		</>
+	);
+}
+
+function AccountMenuItems({
+	activeOrganization,
+	onCopyMcpUrl,
+	onOpenApiKeys,
+	onSignOut,
+}: {
+	activeOrganization: { id: string } | null | undefined;
+	onCopyMcpUrl: () => Promise<void>;
+	onOpenApiKeys: () => void;
+	onSignOut: () => Promise<void>;
+}) {
+	return (
+		<>
+			<DropdownMenuItem asChild>
+				<a href="/api/v1/docs">
+					<BookOpen className="size-4" />
+					<span>Docs</span>
+				</a>
+			</DropdownMenuItem>
+			<DropdownMenuItem onSelect={onOpenApiKeys}>
+				<Key className="size-4" />
+				<span>API keys</span>
+			</DropdownMenuItem>
+			<DropdownMenuItem onSelect={() => void onCopyMcpUrl()}>
+				<Copy className="size-4" />
+				<span>Copy MCP URL</span>
+			</DropdownMenuItem>
+			{activeOrganization ? (
+				<DropdownMenuItem asChild>
+					<Link to="/dashboard/organization-settings">
+						<Building2 className="size-4" />
+						<span>Organization settings</span>
+					</Link>
+				</DropdownMenuItem>
+			) : null}
+			<DropdownMenuItem asChild>
+				<Link to="/dashboard/profile">
+					<UserRound className="size-4" />
+					<span>Profile</span>
+				</Link>
+			</DropdownMenuItem>
+			<DropdownMenuSeparator />
+			<DropdownMenuItem onSelect={() => void onSignOut()} variant="destructive">
+				<LogOut className="size-4" />
+				<span>Sign out</span>
+			</DropdownMenuItem>
 		</>
 	);
 }
@@ -252,6 +287,19 @@ function DashboardSidebarFooter({
 	const [apiKeyDrawerOpen, setApiKeyDrawerOpen] = useState(false);
 	const userLabel = user?.name ?? user?.email ?? "Signed in";
 
+	async function handleCopyMcpUrl() {
+		const mcpUrl = `${window.location.origin}/api/mcp`;
+
+		try {
+			await navigator.clipboard.writeText(mcpUrl);
+			toast.success("MCP URL copied");
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to copy MCP URL",
+			);
+		}
+	}
+
 	if (isCollapsed && !isMobile) {
 		return (
 			<SidebarFooter className="p-0">
@@ -280,32 +328,12 @@ function DashboardSidebarFooter({
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start" side="right">
-						<DropdownMenuItem onSelect={() => setApiKeyDrawerOpen(true)}>
-							<Key className="size-4" />
-							<span>API keys</span>
-						</DropdownMenuItem>
-						{activeOrganization ? (
-							<DropdownMenuItem asChild>
-								<Link to="/dashboard/organization-settings">
-									<Building2 className="size-4" />
-									<span>Organization settings</span>
-								</Link>
-							</DropdownMenuItem>
-						) : null}
-						<DropdownMenuItem asChild>
-							<Link to="/dashboard/profile">
-								<UserRound className="size-4" />
-								<span>Profile</span>
-							</Link>
-						</DropdownMenuItem>
-						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							onSelect={() => void onSignOut()}
-							variant="destructive"
-						>
-							<LogOut className="size-4" />
-							<span>Sign out</span>
-						</DropdownMenuItem>
+						<AccountMenuItems
+							activeOrganization={activeOrganization}
+							onCopyMcpUrl={handleCopyMcpUrl}
+							onOpenApiKeys={() => setApiKeyDrawerOpen(true)}
+							onSignOut={onSignOut}
+						/>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</SidebarFooter>
@@ -317,6 +345,7 @@ function DashboardSidebarFooter({
 			<ThemeToggle />
 			<SessionFooter
 				activeOrganization={activeOrganization}
+				onCopyMcpUrl={handleCopyMcpUrl}
 				onSignOut={onSignOut}
 				user={user}
 			/>

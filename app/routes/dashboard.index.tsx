@@ -2,16 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
 	Activity,
 	ArrowRight,
-	Check,
 	Cloud,
-	Copy,
 	Database,
 	Layers3,
-	Server,
 	UserRound,
 } from "lucide-react";
-import { useState } from "react";
-import { Button } from "~/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -84,7 +79,6 @@ function DashboardOverviewPage() {
 					))}
 				</CardContent>
 			</Card>
-			<McpEndpointCard />
 			<div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
 				<Card className="border-border/70">
 					<CardHeader>
@@ -149,48 +143,5 @@ function DashboardOverviewPage() {
 				</Card>
 			</div>
 		</div>
-	);
-}
-
-function McpEndpointCard() {
-	const [copied, setCopied] = useState(false);
-	const mcpUrl =
-		typeof window !== "undefined"
-			? `${window.location.origin}/api/mcp`
-			: "/api/mcp";
-
-	async function copyToClipboard() {
-		await navigator.clipboard.writeText(mcpUrl);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	}
-
-	return (
-		<Card className="border-border/70">
-			<CardHeader>
-				<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-					<Server className="size-4" />
-					MCP Server
-				</div>
-				<CardTitle>MCP endpoint</CardTitle>
-				<CardDescription>
-					Use this URL to connect external MCP clients to your server.
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<div className="flex items-center gap-2">
-					<code className="flex-1 truncate rounded-2xl border border-border/70 bg-accent px-3 py-2 font-mono text-sm select-all">
-						{mcpUrl}
-					</code>
-					<Button onClick={copyToClipboard} size="icon" variant="outline">
-						{copied ? (
-							<Check className="size-4 text-green-600" />
-						) : (
-							<Copy className="size-4" />
-						)}
-					</Button>
-				</div>
-			</CardContent>
-		</Card>
 	);
 }
