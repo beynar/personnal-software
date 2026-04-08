@@ -4,6 +4,17 @@ compatibility_flags = ["nodejs_compat"]
 main = "@tanstack/react-start/server-entry"
 
 # =============================================================================
+# Worker Loader (Dynamic Workers / Codemode)
+# =============================================================================
+# Required by @cloudflare/codemode for sandboxed code execution.
+# The LOADER binding lets the app spin up isolated Worker instances at runtime.
+# No auth secrets are passed into the sandbox — tool calls dispatch back to the
+# host via Workers RPC.
+#
+# Reference: https://developers.cloudflare.com/workers/runtime-apis/bindings/worker-loader/
+worker_loaders = [{ binding = "LOADER" }]
+
+# =============================================================================
 # Cron Triggers (Scheduled Events)
 # =============================================================================
 # Uncomment to enable scheduled tasks. Each cron pattern invokes the Worker's
