@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { extractApiKey, validateApiKey } from "~/lib/api-auth";
 import type { McpSession } from "~/lib/mcp-server";
 import { handleMcpRequest } from "~/lib/mcp-server";
 
@@ -16,10 +17,35 @@ async function validateBearerToken(token: string): Promise<McpSession | null> {
 		if (!response.ok) return null;
 		const data = (await response.json()) as Record<string, unknown>;
 		if (!data?.user) return null;
-		return data as unknown as McpSession;
+		const session = data as unknown as Omit<McpSession, "credential">;
+		return { ...session, credential: { type: "bearer", token } };
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Validates an API key via Better Auth's get-session endpoint (with
+ * enableSessionForAPIKeys). Returns an McpSession or null.
+ */
+async function validateApiKeySession(
+	apiKey: string,
+): Promise<McpSession | null> {
+	const result = await validateApiKey(apiKey);
+	if (!result) return null;
+	return {
+		user: {
+			id: result.user.id,
+			email: result.user.email,
+			name: result.user.name,
+			createdAt: String(result.user.createdAt),
+		},
+		session: {
+			id: result.session.id,
+			expiresAt: String(result.session.expiresAt),
+		},
+		credential: { type: "api-key", apiKey },
+	};
 }
 
 /**
@@ -46,17 +72,31 @@ function unauthorizedResponse(requestUrl: string): Response {
 }
 
 /**
- * Handles incoming MCP POST requests: validates bearer token, parses
- * JSON-RPC message(s), and dispatches to the MCP server handler.
+ * Extracts and validates credentials from the request.
+ * Tries Bearer token first, then falls back to x-api-key.
  */
-async function handleMcpPost(request: Request): Promise<Response> {
+async function authenticate(request: Request): Promise<McpSession | null> {
+	// Try Bearer token first
 	const authorization = request.headers.get("Authorization");
-	if (!authorization?.startsWith("Bearer ")) {
-		return unauthorizedResponse(request.url);
+	if (authorization?.startsWith("Bearer ")) {
+		return validateBearerToken(authorization.slice(7));
 	}
 
-	const token = authorization.slice(7);
-	const session = await validateBearerToken(token);
+	// Try API key
+	const apiKey = extractApiKey(request);
+	if (apiKey) {
+		return validateApiKeySession(apiKey);
+	}
+
+	return null;
+}
+
+/**
+ * Handles incoming MCP POST requests: validates credentials (bearer or
+ * API key), parses JSON-RPC message(s), and dispatches to the MCP server.
+ */
+async function handleMcpPost(request: Request): Promise<Response> {
+	const session = await authenticate(request);
 	if (!session) {
 		return unauthorizedResponse(request.url);
 	}
@@ -114,7 +154,7 @@ export const Route = createFileRoute("/api/mcp")({
 						"Access-Control-Allow-Origin": "*",
 						"Access-Control-Allow-Methods": "POST, OPTIONS",
 						"Access-Control-Allow-Headers":
-							"Content-Type, Authorization, Accept",
+							"Content-Type, Authorization, Accept, x-api-key",
 					},
 				}),
 		},

@@ -34,6 +34,10 @@ export type McpSession = {
 		id: string;
 		expiresAt: string;
 	};
+	/** Original credential material for downstream forwarding. */
+	credential:
+		| { type: "bearer"; token: string }
+		| { type: "api-key"; apiKey: string };
 };
 
 type JsonRpcRequest = {

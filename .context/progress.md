@@ -548,3 +548,34 @@
   - `getOpenApiSpec()` returns a plain JS object with standard OpenAPI 3.1 structure — can be cast to minimal type stubs for type-safe traversal
   - chanfana populates the spec eagerly when routes are registered — `buildCatalog()` works synchronously at any point after module initialization
   - Shallow schema summaries (`object{fields}`, `array<type>`) are sufficient for MCP tool discovery — full schema expansion would bloat catalog entries without adding search value
+
+## US-004: Replace the MCP single-tool branch with a registry and add route search
+- Refactored `app/lib/mcp-server.ts` from a hard-coded `if (toolName === ...)` branch to a registry-based dispatcher using a `Map<string, RegisteredTool>`
+- Added `registerTool(definition, handler)` function that registers tools by name with their MCP definition and handler callback
+- `tools/list` now dynamically returns all registered tool definitions from the registry
+- `tools/call` looks up the tool by name in the registry and calls its handler, passing `arguments` (not top-level `params`)
+- Preserved `get-profile` tool — re-registered via `registerTool()` with identical behavior
+- Added `search-routes` tool that accepts a `query` string parameter and returns matching API routes from the OpenAPI catalog via `searchCatalog()` from `app/lib/openapi-catalog.ts`
+- Unknown tools still return JSON-RPC `-32602` (invalid params) error with the tool name
+- All existing MCP methods (`initialize`, `ping`, notifications) continue to work unchanged
+- Files changed: `app/lib/mcp-server.ts` (modified)
+- All quality checks pass: `npm run lint` (143 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - MCP `tools/call` passes tool arguments under `params.arguments`, not as top-level `params` fields — the registry handler receives this sub-object
+  - A `Map`-based registry is sufficient for the MCP tool dispatch — no need for a class hierarchy or plugin system
+  - `registerTool()` at module scope runs during import, so tools are available immediately when the server handles requests
+  - The `searchCatalog()` function from `openapi-catalog.ts` works synchronously and returns `CatalogEntry[]` — suitable for direct use in an MCP tool handler
+
+## US-005: Accept API keys on `/api/mcp` and forward auth context into MCP handlers
+- Updated `app/routes/api.mcp.ts` to accept both `Authorization: Bearer ...` and `x-api-key: ...` headers as alternative auth mechanisms
+- Bearer validation still uses Better Auth's MCP `/mcp/get-session` endpoint (existing path preserved)
+- API-key validation reuses `validateApiKey()` and `extractApiKey()` from `app/lib/api-auth.ts`, which calls Better Auth's `/get-session` with `x-api-key` header (enableSessionForAPIKeys)
+- Added `credential` field to `McpSession` type in `app/lib/mcp-server.ts` — a discriminated union of `{ type: "bearer", token }` or `{ type: "api-key", apiKey }` so downstream handlers can forward the original auth material
+- Added `x-api-key` to `Access-Control-Allow-Headers` in the CORS preflight OPTIONS handler
+- Extracted `authenticate()` helper that tries Bearer first, then API key, returning `McpSession | null`
+- Files changed: `app/routes/api.mcp.ts` (modified), `app/lib/mcp-server.ts` (modified)
+- All quality checks pass: `npm run lint` (143 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - `validateApiKey()` returns `ApiAuthResult` with Date objects for timestamps — must convert to strings when mapping to `McpSession`
+  - The `credential` discriminated union on `McpSession` allows tool handlers to forward auth without knowing the auth mechanism — use `session.credential.type` to branch if needed
+  - Bearer path uses `/api/auth/mcp/get-session` (MCP plugin endpoint) while API key path uses `/api/auth/get-session` (standard Better Auth endpoint intercepted by API key plugin) — different endpoints for different auth flows
