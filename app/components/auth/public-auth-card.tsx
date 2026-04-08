@@ -14,7 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { authClient } from "~/lib/auth-client";
 import { PROJECT_NAME } from "~/lib/project";
 
-export function PublicAuthCard() {
+export function PublicAuthCard({
+	onAuthSuccess,
+}: { onAuthSuccess?: () => void } = {}) {
 	return (
 		<Card className="w-full max-w-sm">
 			<CardHeader className="text-center">
@@ -30,10 +32,10 @@ export function PublicAuthCard() {
 						<TabsTrigger value="signup">Create Account</TabsTrigger>
 					</TabsList>
 					<TabsContent value="login">
-						<LoginForm />
+						<LoginForm onAuthSuccess={onAuthSuccess} />
 					</TabsContent>
 					<TabsContent value="signup">
-						<SignUpForm />
+						<SignUpForm onAuthSuccess={onAuthSuccess} />
 					</TabsContent>
 				</Tabs>
 			</CardContent>
@@ -41,7 +43,7 @@ export function PublicAuthCard() {
 	);
 }
 
-function LoginForm() {
+function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 	const navigate = useNavigate();
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -62,7 +64,11 @@ function LoginForm() {
 				setError(authError.message ?? "Failed to sign in");
 				return;
 			}
-			navigate({ to: "/dashboard" });
+			if (onAuthSuccess) {
+				onAuthSuccess();
+			} else {
+				navigate({ to: "/dashboard" });
+			}
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to sign in");
 		} finally {
@@ -101,7 +107,7 @@ function LoginForm() {
 	);
 }
 
-function SignUpForm() {
+function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 	const navigate = useNavigate();
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -135,7 +141,11 @@ function SignUpForm() {
 				setError(authError.message ?? "Failed to create account");
 				return;
 			}
-			navigate({ to: "/dashboard" });
+			if (onAuthSuccess) {
+				onAuthSuccess();
+			} else {
+				navigate({ to: "/dashboard" });
+			}
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to create account");
 		} finally {
