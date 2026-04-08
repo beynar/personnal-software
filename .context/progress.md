@@ -408,3 +408,42 @@
   - The MCP plugin in Better Auth (server-side) does NOT need a corresponding client plugin — it's entirely server-side OAuth infrastructure
   - `@modelcontextprotocol/sdk` is intentionally not used — its Node.js transports are incompatible with Cloudflare Workers, so a manual JSON-RPC 2.0 handler was implemented
   - The `.well-known` paths must be intercepted in `server.ts` before TanStack routing because dot-notation in flat routes means `.well-known` would be interpreted as a nested route segment
+
+## US-008: Refactor sidebar footer into dropdown account menu
+- Replaced stacked button layout in `SessionFooter` and collapsed sidebar footer with a dropdown menu triggered from the user avatar/name area
+- Made `ApiKeyDrawer` controllable with `open`, `onOpenChange`, and `showTrigger` props so it can be opened programmatically from the dropdown without rendering its own trigger button
+- Both expanded and collapsed sidebar states now use the same dropdown pattern (API keys, org settings, profile, sign out)
+- Updated `SessionFooterSkeleton` to match the new layout (avatar + chevron instead of button grid)
+- Fixed React hooks violation: moved `useState` call before early return in `SessionFooter`
+- Files changed: `app/components/api-keys/api-key-drawer.tsx`, `app/routes/dashboard.tsx`
+- All quality checks pass: `npm run lint`, `npm run typecheck`, `npm run build`
+- **Learnings for future iterations:**
+  - Making a Drawer component controllable (open/onOpenChange) while keeping uncontrolled mode requires a pattern: `const open = controlledOpen ?? uncontrolledOpen` with dual state
+  - React hooks must always be called before any early returns — even seemingly harmless skeleton early returns can cause hooks ordering violations
+  - The `DropdownMenuItem` with `onSelect` is better than wrapping a `Button` for menu actions — it handles keyboard navigation and focus management automatically
+  - `DropdownMenuItem` supports `variant="destructive"` for dangerous actions like sign-out
+
+## US-001: Add OpenAPI stack dependencies
+- Added `hono@^4.12.12`, `chanfana@^3.3.0`, and `@scalar/hono-api-reference@^0.10.6` to `dependencies` in `package.json`
+- Updated `package-lock.json` (12 new packages added)
+- All quality checks pass: `npm run lint` (139 files, no issues), `npm run typecheck` (clean), `npm run build` (successful, 8.36s)
+- No duplicate or conflicting API framework packages — these are complementary to the existing TanStack Start stack
+- Files changed: `package.json`, `package-lock.json`
+- **Learnings for future iterations:**
+  - `chanfana` is an OpenAPI framework that works with Hono (successor to `chanfana` for Cloudflare Workers)
+  - `@scalar/hono-api-reference` provides a Swagger-like API docs UI as a Hono middleware
+  - These packages are additive — they don't conflict with TanStack Start's routing since they'll be mounted on specific API paths
+
+## US-002: Create a TanStack Start API route that delegates to Hono
+- Created `app/lib/api.ts` — a focused Hono app with `basePath("/api/v1")`, chanfana wired for OpenAPI spec at `/api/v1/openapi.json`, and Scalar API reference UI at `/api/v1/docs`
+- Created `app/routes/api.v1.$.ts` — thin TanStack Start route file that delegates all HTTP methods (GET, POST, PUT, PATCH, DELETE, OPTIONS) to `app.fetch(request)` from the Hono app, mirroring the pattern in `api.auth.$.ts` and `api.mcp.ts`
+- No changes to existing `/api/auth/$` or `/api/mcp` routes
+- Files changed: `app/lib/api.ts` (new), `app/routes/api.v1.$.ts` (new)
+- All quality checks pass: `npm run lint` (141 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - `fromHono(app, options)` from chanfana auto-detects Hono's `basePath()` — no need to pass a separate `base` option
+  - `docs_url: null` disables chanfana's built-in docs page so we can use Scalar instead
+  - `@scalar/hono-api-reference` v0.10.x uses `url` (not `spec.url`) for the OpenAPI spec URL — the old `spec` property doesn't exist in `HtmlRenderingConfiguration`
+  - TanStack Router splat route `api.v1.$.ts` maps to `/api/v1/*`, matching the Hono app's basePath
+  - The route tree (`routeTree.gen.ts`) must be regenerated via `vite build` before typecheck passes for new route files
+  - Hono's `app.fetch(request)` is the standard way to delegate from any HTTP handler to a Hono app — it returns a `Response` directly
