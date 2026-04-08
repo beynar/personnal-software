@@ -109,7 +109,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 				},
 			}),
 			mcp({
-				loginPage: "/sign-in",
+				loginPage: "/mcp/login",
 			}),
 		],
 		hooks: {
