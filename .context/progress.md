@@ -375,3 +375,36 @@
   - RFC 8414 OAuth Authorization Server Metadata fields: `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `response_types_supported`, `grant_types_supported`, `code_challenge_methods_supported`
   - RFC 9728 OAuth Protected Resource Metadata fields: `resource`, `authorization_servers`, `bearer_methods_supported`, `scopes_supported`
   - The `resource` URL in protected resource metadata should use the request origin so it resolves correctly in both dev (localhost:8888) and production (deployed worker URL)
+
+## US-006: Expose the real MCP endpoint in the dashboard
+- Added `McpEndpointCard` component to `app/routes/dashboard.index.tsx` that displays the full MCP server URL (`{origin}/api/mcp`)
+- Card includes a copy-to-clipboard button following the existing pattern from `api-key-drawer.tsx` (navigator.clipboard + copied state with 2s timeout + Check/Copy icon toggle)
+- URL is derived from `window.location.origin` at runtime so it works in both dev (localhost:8888) and production (deployed worker URL), with `/api/mcp` fallback for SSR
+- Card placed between the overview cards grid and the navigation test section on the dashboard overview page
+- Files changed: `app/routes/dashboard.index.tsx` (modified)
+- All quality checks pass: `npm run lint`, `npm run typecheck`, `npm run build`
+- **Learnings for future iterations:**
+  - The MCP endpoint is at `/api/mcp` on the app's own origin (not the Convex site URL) — this is a TanStack Start API route
+  - `window.location.origin` is the simplest way to get the full URL in the browser; use a relative fallback for SSR where `window` is undefined
+  - The clipboard copy pattern in this codebase uses `navigator.clipboard.writeText` + a `copied` boolean state with `setTimeout` reset — no try/catch or error handling
+
+## US-007: Verify the end-to-end MCP authentication flow
+- Verified all quality checks pass: `npm run lint` (139 files, no issues), `npm run typecheck` (clean), `npm run build` (successful, 7.09s)
+- Verified end-to-end MCP auth flow by code review of all 10 key files:
+  - Discovery: `app/server.ts` serves `/.well-known/oauth-authorization-server` (RFC 8414) and `/.well-known/oauth-protected-resource` (RFC 9728) with correct metadata
+  - Protected endpoint: `app/routes/api.mcp.ts` returns 401 with `WWW-Authenticate` header when no bearer token, validates tokens via `/api/auth/mcp/get-session`
+  - MCP login: `app/routes/mcp.login.tsx` is context-aware (captures OAuth params), shows auth UI for unauthenticated users, and redirects to authorize endpoint after login
+  - MCP server: `app/lib/mcp-server.ts` implements JSON-RPC 2.0 with `initialize`, `ping`, `tools/list`, `tools/call` (get-profile) methods
+  - Better Auth config: `convex/auth.ts` has `mcp({ loginPage: "/mcp/login" })` plugin correctly configured
+- Verified existing auth still works by reviewing:
+  - `app/routes/index.tsx` — root login with `beforeLoad` guard redirecting authenticated users to dashboard
+  - `app/routes/dashboard.tsx` — dashboard with `beforeLoad` guard redirecting unauthenticated users to login, sign-out via `authClient.signOut()`
+  - `app/lib/auth-client.ts` — Better Auth client with convexClient, organizationClient, apiKeyClient plugins
+  - `app/lib/auth-server.ts` — server-side `getToken` and `handler` exports from `convexBetterAuthReactStart`
+- No code changes required — all implementations from US-001 through US-006 are correct and well-connected
+- Files changed: `.context/progress.md` (this file)
+- **Learnings for future iterations:**
+  - The MCP auth flow is: discovery → 401 → authorize redirect → login page → authorize grant → token exchange → authenticated MCP access
+  - The MCP plugin in Better Auth (server-side) does NOT need a corresponding client plugin — it's entirely server-side OAuth infrastructure
+  - `@modelcontextprotocol/sdk` is intentionally not used — its Node.js transports are incompatible with Cloudflare Workers, so a manual JSON-RPC 2.0 handler was implemented
+  - The `.well-known` paths must be intercepted in `server.ts` before TanStack routing because dot-notation in flat routes means `.well-known` would be interpreted as a nested route segment
