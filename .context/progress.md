@@ -447,3 +447,17 @@
   - TanStack Router splat route `api.v1.$.ts` maps to `/api/v1/*`, matching the Hono app's basePath
   - The route tree (`routeTree.gen.ts`) must be regenerated via `vite build` before typecheck passes for new route files
   - Hono's `app.fetch(request)` is the standard way to delegate from any HTTP handler to a Hono app — it returns a `Response` directly
+
+## US-003: Expose the OpenAPI spec and sample endpoint
+- Added `TestEndpoint` class extending `OpenAPIRoute` from chanfana with zod-validated response schema to `app/lib/api.ts`
+- Registered `GET /api/v1/test` via `openapi.get("/test", TestEndpoint)` — included in the generated OpenAPI spec automatically
+- `GET /api/v1/openapi.json` returns a valid OpenAPI JSON document with the test endpoint documented
+- `GET /api/v1/test` returns `{ success: true, message: "API is operational", timestamp: "<ISO>" }`
+- Files changed: `app/lib/api.ts` (modified)
+- All quality checks pass: `npm run lint` (141 files, no issues), `npm run typecheck` (clean), `npm run build` (successful)
+- **Learnings for future iterations:**
+  - `fromHono()` returns a chanfana router object — store it to register endpoints via `openapi.get(path, EndpointClass)`
+  - `OpenAPIRoute` subclasses define a `schema` property with `summary`, `description`, `responses` (and optionally `request`) using zod schemas
+  - The `handle()` method can return a plain object — chanfana auto-serializes it to a JSON `Response`
+  - `zod@4.3.6` is installed as a transitive dependency of chanfana — import `{ z }` from `"zod"` directly
+  - Chanfana automatically includes registered endpoints in the generated OpenAPI spec at the configured `openapi_url`
