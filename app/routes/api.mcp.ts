@@ -24,10 +24,11 @@ async function validateBearerToken(token: string): Promise<McpSession | null> {
 
 /**
  * Returns a 401 response with a WWW-Authenticate header pointing to the
- * OAuth protected-resource metadata, per RFC 9728.
+ * app-hosted OAuth protected-resource metadata, per RFC 9728.
  */
-function unauthorizedResponse(): Response {
-	const resourceMetadata = `${convexSiteUrl}/.well-known/oauth-protected-resource`;
+function unauthorizedResponse(requestUrl: string): Response {
+	const origin = new URL(requestUrl).origin;
+	const resourceMetadata = `${origin}/.well-known/oauth-protected-resource`;
 	return new Response(
 		JSON.stringify({
 			jsonrpc: "2.0",
@@ -51,13 +52,13 @@ function unauthorizedResponse(): Response {
 async function handleMcpPost(request: Request): Promise<Response> {
 	const authorization = request.headers.get("Authorization");
 	if (!authorization?.startsWith("Bearer ")) {
-		return unauthorizedResponse();
+		return unauthorizedResponse(request.url);
 	}
 
 	const token = authorization.slice(7);
 	const session = await validateBearerToken(token);
 	if (!session) {
-		return unauthorizedResponse();
+		return unauthorizedResponse(request.url);
 	}
 
 	let body: unknown;

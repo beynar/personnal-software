@@ -343,3 +343,35 @@
   - `Route.useSearch()` returns the validated search params inside the component
   - Using `window.location.href` instead of TanStack Router's `navigate` is correct for redirecting to external URLs (Convex site URL is a different origin)
   - The `PublicAuthCard` `onAuthSuccess` prop pattern keeps the component reusable while allowing callers to customize post-auth behavior
+
+## US-004: Add a real protected MCP server endpoint
+- Created `app/lib/mcp-server.ts` with a standalone MCP JSON-RPC 2.0 protocol handler (no SDK dependency — Cloudflare Workers incompatible with `@modelcontextprotocol/sdk`'s Node.js transports)
+- Created `app/routes/api.mcp.ts` as the HTTP endpoint at `/api/mcp` with POST and OPTIONS handlers
+- Bearer token validation calls Better Auth's `/mcp/get-session` endpoint on the Convex site URL
+- Unauthenticated requests receive a 401 with `WWW-Authenticate: Bearer resource_metadata="..."` header pointing to the OAuth protected-resource metadata URL (RFC 9728)
+- Implements one real MCP tool: `get-profile` that returns the authenticated user's profile (id, email, name, createdAt) from the validated session
+- Handles MCP protocol methods: `initialize`, `ping`, `tools/list`, `tools/call`, plus notifications (`notifications/initialized`, `notifications/cancelled`)
+- Supports both single JSON-RPC requests and batched arrays
+- Files changed: `app/lib/mcp-server.ts` (new), `app/routes/api.mcp.ts` (new)
+- All quality checks pass: `npm run lint`, `npm run typecheck`, `npm run build`
+- **Learnings for future iterations:**
+  - `@modelcontextprotocol/sdk`'s `StreamableHTTPServerTransport` uses Node.js `http.IncomingMessage`/`http.ServerResponse` — incompatible with Cloudflare Workers (web standard `Request`/`Response`). Manual JSON-RPC 2.0 dispatch is simpler and portable.
+  - Better Auth MCP plugin's `/mcp/get-session` endpoint validates OAuth access tokens and returns `{ user, session }` — call it from the TanStack Start server at `VITE_CONVEX_SITE_URL/api/auth/mcp/get-session`
+  - RFC 9728 `WWW-Authenticate` header format: `Bearer resource_metadata="<url>"` — the URL points to `/.well-known/oauth-protected-resource` served by Better Auth
+  - MCP JSON-RPC notifications (no `id` field) must not receive responses — return 202 Accepted with no body
+  - `response.json()` returns `{}` type in strict TypeScript — cast via `Record<string, unknown>` intermediate to satisfy Biome's `noExplicitAny`
+  - TanStack Start API routes with `server.handlers` need the route tree regenerated via `vite build` before typecheck passes
+
+## US-005: Publish MCP discovery metadata for the real server
+- Added `/.well-known/oauth-authorization-server` endpoint (RFC 8414) returning OAuth discovery metadata for the Better Auth authority at `VITE_CONVEX_SITE_URL/api/auth`, including authorization, token, and registration endpoints
+- Added `/.well-known/oauth-protected-resource` endpoint (RFC 9728) returning protected resource metadata for the MCP server at `/api/mcp`, referencing the Better Auth authorization server
+- Both endpoints are public GET handlers with JSON responses and CORS headers, implemented as request interceptors in `app/server.ts` before TanStack Start routing
+- Updated `app/routes/api.mcp.ts` to derive the `WWW-Authenticate` resource metadata URL from the request origin (points to the app's own `.well-known` endpoint instead of the Convex site URL)
+- Files changed: `app/server.ts` (modified), `app/routes/api.mcp.ts` (modified)
+- All quality checks pass: `npm run lint`, `npm run typecheck`, `npm run build`
+- **Learnings for future iterations:**
+  - TanStack Router uses dots as path separators in flat routes, so `.well-known` paths cannot be file-based routes — they must be intercepted in `server.ts` before TanStack Start routing
+  - `server.ts` `createServerEntry` wraps the fetch handler, making it the right place to intercept requests that fall outside the router's file-based conventions
+  - RFC 8414 OAuth Authorization Server Metadata fields: `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `response_types_supported`, `grant_types_supported`, `code_challenge_methods_supported`
+  - RFC 9728 OAuth Protected Resource Metadata fields: `resource`, `authorization_servers`, `bearer_methods_supported`, `scopes_supported`
+  - The `resource` URL in protected resource metadata should use the request origin so it resolves correctly in both dev (localhost:8888) and production (deployed worker URL)
