@@ -8,6 +8,7 @@
  * Tools are registered via `registerTool()` — no hard-coded branches.
  */
 
+import { executeApiRequest } from "~/lib/mcp-openapi-tools";
 import { searchCatalog } from "~/lib/openapi-catalog";
 
 const SERVER_INFO = {
@@ -64,7 +65,7 @@ type ToolDefinition = {
 type ToolHandler = (
 	params: Record<string, unknown>,
 	session: McpSession,
-) => ToolResult;
+) => ToolResult | Promise<ToolResult>;
 
 type RegisteredTool = {
 	definition: ToolDefinition;
@@ -141,6 +142,58 @@ registerTool(
 	},
 );
 
+registerTool(
+	{
+		name: "execute",
+		description:
+			"Execute an API request against /api/v1 routes. The host forwards your authenticated credential — sandboxed code never handles secrets directly. Returns a response envelope with status, content type, headers, parsed body, and truncation flag.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				method: {
+					type: "string",
+					description:
+						'HTTP method (GET, POST, PUT, PATCH, DELETE). Defaults to "GET".',
+				},
+				path: {
+					type: "string",
+					description:
+						'API path, e.g. "/test" or "/api/v1/test". Paths without the /api/v1 prefix are auto-prefixed.',
+				},
+				headers: {
+					type: "object",
+					description:
+						"Optional request headers. Auth headers are injected automatically.",
+				},
+				body: {
+					description:
+						"Optional request body (object or string). Automatically JSON-serialized for non-GET requests.",
+				},
+			},
+			required: ["path"],
+		},
+	},
+	async (params, session) => {
+		const envelope = await executeApiRequest(
+			{
+				method: params.method as string | undefined,
+				path: params.path as string | undefined,
+				headers: params.headers as Record<string, string> | undefined,
+				body: params.body,
+			},
+			session,
+		);
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(envelope, null, 2),
+				},
+			],
+		};
+	},
+);
+
 // ---- JSON-RPC helpers ----
 
 function jsonRpcError(
@@ -159,10 +212,10 @@ function jsonRpcResult(id: string | number | null, result: unknown) {
  * Dispatches a single JSON-RPC request and returns the response object,
  * or null for notifications (requests without an id).
  */
-export function handleMcpRequest(
+export async function handleMcpRequest(
 	request: JsonRpcRequest,
 	session: McpSession,
-): object | null {
+): Promise<object | null> {
 	const isNotification = request.id === undefined || request.id === null;
 
 	switch (request.method) {
@@ -192,7 +245,8 @@ export function handleMcpRequest(
 			if (tool) {
 				const args =
 					(request.params?.arguments as Record<string, unknown>) ?? {};
-				return jsonRpcResult(request.id ?? null, tool.handler(args, session));
+				const result = await tool.handler(args, session);
+				return jsonRpcResult(request.id ?? null, result);
 			}
 			return jsonRpcError(
 				request.id ?? null,

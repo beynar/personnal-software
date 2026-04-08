@@ -117,9 +117,10 @@ async function handleMcpPost(request: Request): Promise<Response> {
 
 	// Handle batch requests (array of JSON-RPC messages)
 	if (Array.isArray(body)) {
-		const responses = body
-			.map((msg) => handleMcpRequest(msg, session))
-			.filter(Boolean);
+		const results = await Promise.all(
+			body.map((msg) => handleMcpRequest(msg, session)),
+		);
+		const responses = results.filter(Boolean);
 		if (responses.length === 0) {
 			return new Response(null, { status: 202 });
 		}
@@ -129,7 +130,7 @@ async function handleMcpPost(request: Request): Promise<Response> {
 	}
 
 	// Handle single request
-	const result = handleMcpRequest(
+	const result = await handleMcpRequest(
 		body as Parameters<typeof handleMcpRequest>[0],
 		session,
 	);
