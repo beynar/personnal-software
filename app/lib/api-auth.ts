@@ -46,6 +46,7 @@ export interface ApiAuthResult {
 export async function validateApiKey(
 	apiKey: string,
 ): Promise<ApiAuthResult | null> {
+	console.log({ apiKey });
 	try {
 		const response = await fetch(`${convexSiteUrl}/api/auth/get-session`, {
 			headers: { "x-api-key": apiKey },
@@ -65,4 +66,20 @@ export async function validateApiKey(
  */
 export function extractApiKey(request: Request): string | null {
 	return request.headers.get("x-api-key") || null;
+}
+
+/**
+ * Extracts an API key from Authorization: Bearer <key>.
+ * Returns null when the header is missing, malformed, or empty.
+ */
+export function extractBearerApiKey(request: Request): string | null {
+	const authHeader = request.headers.get("authorization");
+	if (!authHeader) return null;
+
+	const [scheme, token] = authHeader.split(" ");
+	if (scheme?.toLowerCase() !== "bearer" || !token) {
+		return null;
+	}
+
+	return token;
 }

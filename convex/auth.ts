@@ -109,6 +109,10 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 				// REST and MCP callers using the same credential type.
 				apiKeyHeaders: "x-api-key",
 				enableSessionForAPIKeys: true,
+				// Convex serves /get-session in query context, where adapter writes are
+				// intentionally skipped by the bridge. Defer API-key bookkeeping so
+				// session lookup does not fail on a no-op update.
+				deferUpdates: true,
 				rateLimit: {
 					enabled: false,
 				},

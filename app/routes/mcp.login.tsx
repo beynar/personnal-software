@@ -49,14 +49,13 @@ export const Route = createFileRoute("/mcp/login")({
 });
 
 function buildAuthorizeUrl(search: McpSearchParams): string {
-	const siteUrl = import.meta.env.VITE_CONVEX_SITE_URL as string;
 	const params = new URLSearchParams();
 	for (const [key, value] of Object.entries(search)) {
 		if (value) {
 			params.set(key, value);
 		}
 	}
-	return `${siteUrl}/api/auth/mcp/authorize?${params.toString()}`;
+	return `/api/auth/mcp/authorize?${params.toString()}`;
 }
 
 function McpLoginPage() {

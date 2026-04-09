@@ -2,7 +2,7 @@ import { apiReference } from "@scalar/hono-api-reference";
 import { OpenAPIRoute, fromHono } from "chanfana";
 import { Hono } from "hono";
 import { z } from "zod";
-import { extractApiKey, validateApiKey } from "~/lib/api-auth";
+import { extractBearerApiKey, validateApiKey } from "~/lib/api-auth";
 
 const apiApp = new Hono().basePath("/api/v1");
 
@@ -14,9 +14,12 @@ apiApp.use("*", async (c, next) => {
 		return next();
 	}
 
-	const apiKey = extractApiKey(c.req.raw);
+	const apiKey = extractBearerApiKey(c.req.raw);
 	if (!apiKey) {
-		return c.json({ error: "Missing x-api-key header" }, 401);
+		return c.json(
+			{ error: "Missing Authorization: Bearer <api-key> header" },
+			401,
+		);
 	}
 
 	const result = await validateApiKey(apiKey);
@@ -38,13 +41,13 @@ const openapi = fromHono(apiApp, {
 			title: "Bubbly Dragon API",
 			version: "1.0.0",
 		},
-		security: [{ apiKey: [] }],
+		security: [{ bearerAuth: [] }],
 		components: {
 			securitySchemes: {
-				apiKey: {
-					type: "apiKey",
-					in: "header",
-					name: "x-api-key",
+				bearerAuth: {
+					type: "http",
+					scheme: "bearer",
+					description: "Send the API key as Authorization: Bearer <api-key>.",
 				},
 			},
 		},
@@ -92,7 +95,7 @@ apiApp.get(
 		theme: "kepler",
 		pageTitle: "Bubbly Dragon API Reference",
 		authentication: {
-			preferredSecurityScheme: "apiKey",
+			preferredSecurityScheme: "bearerAuth",
 		},
 	}),
 );

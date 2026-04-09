@@ -146,10 +146,10 @@ This repo exposes two machine interfaces: a REST API and an MCP server. Both req
 
 ### REST API (`/api/v1/*`)
 
-All REST endpoints require the `x-api-key` header. Create an API key from the dashboard account menu.
+All REST endpoints require `Authorization: Bearer <api-key>`. Create an API key from the dashboard account menu.
 
 ```bash
-curl -H "x-api-key: bd_your_key_here" https://your-app.example.com/api/v1/test
+curl -H "Authorization: Bearer bd_your_key_here" https://your-app.example.com/api/v1/test
 ```
 
 The OpenAPI spec and interactive API reference are publicly accessible without a key:
@@ -180,35 +180,35 @@ MCP discovery endpoints (served by Better Auth's `mcp` plugin):
 
 ### MCP tools
 
-The MCP server exposes three tools:
+The MCP server exposes two tools:
 
 | Tool | Description |
 |------|-------------|
-| `get-profile` | Returns the authenticated user's profile |
-| `search-routes` | Searches the OpenAPI route catalog by keyword |
-| `execute` | Executes an API request against the REST API |
+| `search-routes` | Searches the public OpenAPI route catalog by keyword |
+| `execute` | Executes JavaScript inside a Cloudflare dynamic worker sandbox |
 
-### Host-side request proxying
+### Sandboxed code execution
 
-The `execute` tool uses host-side request proxying rather than exposing credentials inside sandboxed code. When a tool call arrives, the MCP server constructs and dispatches the HTTP request on the host using the caller's credentials. The sandboxed environment never receives API keys or tokens — it only describes what request to make and receives the response envelope.
+The `execute` tool runs code through `DynamicWorkerExecutor` using the Cloudflare Worker loader binding. The caller sends JavaScript, the host runs it inside an isolated Worker sandbox, and the sandbox can only interact with the app through a recursive `api.*` proxy over the public OpenAPI routes.
 
-This means:
+Available sandbox routes:
 
-- Sandboxed code cannot leak or misuse credentials
-- API-key callers get their key forwarded to the REST API automatically
-- Bearer-token callers can call any MCP tool but may receive a `401` from API-key-only REST endpoints (this is surfaced via an `authNote` field in the response)
+- `api.openapiJson.get()` — calls `GET /api/v1/openapi.json`
+- `api.docs.get()` — calls `GET /api/v1/docs`
+
+Route discovery stays at the MCP top level through `search-routes`. The sandbox itself does not get a separate search helper or any access to protected REST routes.
 
 ### Verification checklist
 
 After setting up auth and API keys, verify the following:
 
 - [ ] **Unauthenticated REST rejection**: `curl https://your-app.example.com/api/v1/test` returns `401`
-- [ ] **Authenticated REST success**: `curl -H "x-api-key: bd_..." https://your-app.example.com/api/v1/test` returns `200`
+- [ ] **Authenticated REST success**: `curl -H "Authorization: Bearer bd_..." https://your-app.example.com/api/v1/test` returns `200`
 - [ ] **Protected OpenAPI behavior**: `GET /api/v1/docs` loads the API reference without a key; making a request from the docs UI without a key shows a `401`
 - [ ] **Bearer MCP success**: An MCP client that completed the OAuth flow can call `tools/list` and `tools/call` on `/api/mcp`
 - [ ] **API-key MCP success**: `curl -X POST -H "x-api-key: bd_..." -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' https://your-app.example.com/api/mcp` returns the tool list
-- [ ] **search-routes tool**: Calling `search-routes` with `{"query":"test"}` returns the `/api/v1/test` endpoint
-- [ ] **execute tool**: Calling `execute` with `{"method":"GET","path":"/test"}` returns the test endpoint response
+- [ ] **search-routes tool**: Calling `search-routes` with `{"query":"openapi"}` returns `/api/v1/openapi.json`
+- [ ] **execute tool**: Calling `execute` with `{"code":"async () => await api.openapiJson.get()"}` returns the sandbox result envelope
 
 ## Available Scripts
 

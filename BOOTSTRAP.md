@@ -153,7 +153,7 @@ After creating an account, verify REST and MCP auth:
    ```
 4. Verify REST success with a key:
    ```bash
-   curl -H "x-api-key: bd_your_key" http://localhost:8888/api/v1/test
+   curl -H "Authorization: Bearer bd_your_key" http://localhost:8888/api/v1/test
    # expect 200 with JSON
    ```
 5. Verify API reference loads: open `http://localhost:8888/api/v1/docs`
@@ -166,7 +166,7 @@ After creating an account, verify REST and MCP auth:
    # expect JSON-RPC response with tool list
    ```
 
-The `execute` MCP tool proxies requests through the host process. Credentials are never exposed to sandboxed code — the host attaches the caller's API key or bearer token when dispatching the request to the REST API.
+The `execute` MCP tool runs JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox does not receive raw credentials. It only gets a host-exposed `api.*` recursive proxy and can only call the public routes `/api/v1/openapi.json` and `/api/v1/docs`, for example `api.openapiJson.get()` and `api.docs.get()`.
 
 ## 7. Cloudflare deployment with Wrangler CLI
 

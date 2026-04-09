@@ -18,6 +18,33 @@ export interface CatalogEntry {
 	schemaSummary: string;
 }
 
+const PUBLIC_ROUTE_CATALOG: CatalogEntry[] = [
+	{
+		method: "GET",
+		path: "/api/v1/openapi.json",
+		summary: "OpenAPI schema",
+		description:
+			"Returns the machine-readable OpenAPI 3.1 schema for the public API surface.",
+		tags: ["public", "openapi"],
+		parameters: [],
+		requestBodyContentTypes: [],
+		responseContentTypes: ["application/json"],
+		schemaSummary: "res200(application/json): object",
+	},
+	{
+		method: "GET",
+		path: "/api/v1/docs",
+		summary: "API reference",
+		description:
+			"Returns the interactive API reference UI for the public API surface.",
+		tags: ["public", "docs"],
+		parameters: [],
+		requestBodyContentTypes: [],
+		responseContentTypes: ["text/html"],
+		schemaSummary: "res200(text/html): string",
+	},
+];
+
 /**
  * Derives a compact route catalog from the in-memory OpenAPI spec.
  * Reads the spec synchronously via `getOpenApiSpec()` — no HTTP fetch needed.
@@ -82,6 +109,24 @@ export function searchCatalog(query: string): CatalogEntry[] {
 			return { entry, score };
 		})
 		.filter((s) => s.score > 0);
+
+	scored.sort((a, b) => b.score - a.score);
+	return scored.map((s) => s.entry);
+}
+
+/** Search only the public route catalog exposed to MCP callers. */
+export function searchPublicCatalog(query: string): CatalogEntry[] {
+	if (!query) return PUBLIC_ROUTE_CATALOG;
+
+	const q = query.toLowerCase();
+	const scored = PUBLIC_ROUTE_CATALOG.map((entry) => {
+		let score = 0;
+		if (entry.path.toLowerCase().includes(q)) score += 3;
+		if (entry.summary.toLowerCase().includes(q)) score += 2;
+		if (entry.description.toLowerCase().includes(q)) score += 1;
+		if (entry.tags.some((t) => t.toLowerCase().includes(q))) score += 2;
+		return { entry, score };
+	}).filter((s) => s.score > 0);
 
 	scored.sort((a, b) => b.score - a.score);
 	return scored.map((s) => s.entry);
