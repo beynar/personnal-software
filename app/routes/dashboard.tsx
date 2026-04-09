@@ -16,6 +16,7 @@ import {
 	Key,
 	Layers3,
 	LogOut,
+	Mail,
 	Moon,
 	Sun,
 	UserRound,
@@ -24,6 +25,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ApiKeyDrawer } from "~/components/api-keys/api-key-drawer";
 import { OrganizationSwitcher } from "~/components/organizations/organization-switcher";
+import { PendingInvitationsDrawer } from "~/components/organizations/pending-invitations-drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
@@ -50,6 +52,8 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { authClient } from "~/lib/auth-client";
 import { checkBetterAuthSession } from "~/lib/auth.functions";
+import { ensureOrganizationForSession } from "~/lib/organization";
+import { PROJECT_NAME } from "~/lib/project";
 import { api } from "../../convex/_generated/api";
 
 const dashboardLinks = [
@@ -76,6 +80,37 @@ function DashboardShell() {
 	const syncViewerProfile = useMutation(api.users.syncViewerProfile);
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
+	const { data: activeOrganization, isPending: loadingActiveOrganization } =
+		authClient.useActiveOrganization();
+	const { data: organizations, isPending: loadingOrganizations } =
+		authClient.useListOrganizations();
+
+	useEffect(() => {
+		if (!user?._id) return;
+		if (loadingActiveOrganization || loadingOrganizations) return;
+		void ensureOrganizationForSession(
+			authClient,
+			{ email: user.email, name: user.name },
+			{
+				activeOrganization: activeOrganization?.id
+					? { id: activeOrganization.id }
+					: null,
+				organizations:
+					organizations?.map((organization) => ({
+						id: organization.id,
+						name: organization.name,
+					})) ?? null,
+			},
+		);
+	}, [
+		activeOrganization?.id,
+		loadingActiveOrganization,
+		loadingOrganizations,
+		organizations,
+		user?._id,
+		user?.email,
+		user?.name,
+	]);
 
 	useEffect(() => {
 		if (!user?._id) return;
@@ -90,8 +125,8 @@ function DashboardShell() {
 	return (
 		<SidebarProvider className="min-h-screen">
 			<Sidebar>
-				<SidebarHeader className="px-4 py-3 sm:px-3">
-					<OrganizationSwitcher />
+				<SidebarHeader className="px-4 py-3 sm:px-3 h-18">
+					<DashboardSidebarOrganizationSwitcher />
 				</SidebarHeader>
 				<SidebarContent>
 					<SidebarMenu>
@@ -113,7 +148,7 @@ function DashboardShell() {
 				<DashboardSidebarFooter onSignOut={handleSignOut} user={user} />
 			</Sidebar>
 			<SidebarInset>
-				<header className="sticky top-0 z-10 border-b border-border/70 bg-background/95 backdrop-blur">
+				<header className="sticky top-0 z-10 border-b border-border/70 bg-background/95 backdrop-blur h-18">
 					<div className="flex items-center gap-3 px-4 py-4 sm:px-6">
 						<SidebarTrigger />
 						<div className="min-w-0">
@@ -130,6 +165,12 @@ function DashboardShell() {
 			</SidebarInset>
 		</SidebarProvider>
 	);
+}
+
+function DashboardSidebarOrganizationSwitcher() {
+	const { isCollapsed } = useSidebar();
+
+	return <OrganizationSwitcher isCollapsed={isCollapsed} />;
 }
 
 function SessionFooter({
@@ -151,6 +192,8 @@ function SessionFooter({
 	onSignOut: () => Promise<void>;
 }) {
 	const [apiKeyDrawerOpen, setApiKeyDrawerOpen] = useState(false);
+	const [pendingInvitationsDrawerOpen, setPendingInvitationsDrawerOpen] =
+		useState(false);
 
 	if (user === undefined) {
 		return <SessionFooterSkeleton />;
@@ -165,7 +208,12 @@ function SessionFooter({
 				open={apiKeyDrawerOpen}
 				showTrigger={false}
 			/>
-			<div className="rounded-xl border border-border/70 bg-background/80 p-2">
+			<PendingInvitationsDrawer
+				onOpenChange={setPendingInvitationsDrawerOpen}
+				open={pendingInvitationsDrawerOpen}
+				showTrigger={false}
+			/>
+			<div className="rounded-xl border border-border/70 bg-background/80">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
@@ -192,6 +240,9 @@ function SessionFooter({
 							activeOrganization={activeOrganization}
 							onCopyMcpUrl={onCopyMcpUrl}
 							onOpenApiKeys={() => setApiKeyDrawerOpen(true)}
+							onOpenPendingInvitations={() =>
+								setPendingInvitationsDrawerOpen(true)
+							}
 							onSignOut={onSignOut}
 						/>
 					</DropdownMenuContent>
@@ -205,11 +256,13 @@ function AccountMenuItems({
 	activeOrganization,
 	onCopyMcpUrl,
 	onOpenApiKeys,
+	onOpenPendingInvitations,
 	onSignOut,
 }: {
 	activeOrganization: { id: string } | null | undefined;
 	onCopyMcpUrl: () => Promise<void>;
 	onOpenApiKeys: () => void;
+	onOpenPendingInvitations: () => void;
 	onSignOut: () => Promise<void>;
 }) {
 	return (
@@ -223,6 +276,10 @@ function AccountMenuItems({
 			<DropdownMenuItem onSelect={onOpenApiKeys}>
 				<Key className="size-4" />
 				<span>API keys</span>
+			</DropdownMenuItem>
+			<DropdownMenuItem onSelect={onOpenPendingInvitations}>
+				<Mail className="size-4" />
+				<span>Pending invites</span>
 			</DropdownMenuItem>
 			<DropdownMenuItem onSelect={() => void onCopyMcpUrl()}>
 				<Copy className="size-4" />
@@ -253,7 +310,7 @@ function AccountMenuItems({
 
 function SessionFooterSkeleton() {
 	return (
-		<div className="rounded-xl border border-border/70 bg-background/80 p-2">
+		<div className="rounded-xl border border-border/70 bg-background/80">
 			<div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5">
 				<div className="flex min-w-0 items-center gap-3">
 					<Skeleton className="size-10 shrink-0 rounded-full" />
@@ -285,6 +342,8 @@ function DashboardSidebarFooter({
 	const { data: activeOrganization } = authClient.useActiveOrganization();
 	const { isCollapsed, isMobile } = useSidebar();
 	const [apiKeyDrawerOpen, setApiKeyDrawerOpen] = useState(false);
+	const [pendingInvitationsDrawerOpen, setPendingInvitationsDrawerOpen] =
+		useState(false);
 	const userLabel = user?.name ?? user?.email ?? "Signed in";
 
 	async function handleCopyMcpUrl() {
@@ -306,6 +365,11 @@ function DashboardSidebarFooter({
 				<ApiKeyDrawer
 					onOpenChange={setApiKeyDrawerOpen}
 					open={apiKeyDrawerOpen}
+					showTrigger={false}
+				/>
+				<PendingInvitationsDrawer
+					onOpenChange={setPendingInvitationsDrawerOpen}
+					open={pendingInvitationsDrawerOpen}
 					showTrigger={false}
 				/>
 				<ThemeToggle
@@ -332,6 +396,9 @@ function DashboardSidebarFooter({
 							activeOrganization={activeOrganization}
 							onCopyMcpUrl={handleCopyMcpUrl}
 							onOpenApiKeys={() => setApiKeyDrawerOpen(true)}
+							onOpenPendingInvitations={() =>
+								setPendingInvitationsDrawerOpen(true)
+							}
 							onSignOut={onSignOut}
 						/>
 					</DropdownMenuContent>

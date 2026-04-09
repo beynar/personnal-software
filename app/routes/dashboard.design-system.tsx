@@ -31,6 +31,7 @@ import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { toast } from "sonner";
 import ExampleChatbot from "~/components/ai-elements/example-chatbot";
 import { DataTable } from "~/components/data-table/data-table";
+import { MarkdownRenderer } from "~/components/markdown/markdown-renderer";
 import {
 	Accordion,
 	AccordionContent,
@@ -375,6 +376,7 @@ import {
 	TourStepCounter,
 	TourTitle,
 } from "~/components/ui/tour";
+import { PROJECT_INITIALS, PROJECT_NAME } from "~/lib/project";
 
 export const Route = createFileRoute("/dashboard/design-system")({
 	component: DesignSystemPage,
@@ -457,6 +459,43 @@ const initialKanbanColumns = {
 	ship: [{ id: "deploy", title: "Ship", note: "Run checks and deploy." }],
 };
 
+const markdownShowcaseDocument = `
+# Markdown renderer
+
+Streamdown gives the app a single component for rendering rich markdown documents with first-class support for code, math, mermaid, and streaming-friendly formatting.
+
+## Why it matters
+
+- Reuse one renderer across product docs, AI responses, and internal knowledge surfaces.
+- Keep markdown readable in both light and dark mode.
+- Support richer blocks without building custom renderers for each format.
+
+> This sample is intentionally document-like rather than chat-like so the design system shows the standalone markdown surface.
+
+### Code block
+
+~~~ts
+export async function copyMcpUrl() {
+  await navigator.clipboard.writeText("/api/mcp");
+}
+~~~
+
+### Math
+
+$$
+E = mc^2
+$$
+
+### Mermaid
+
+~~~mermaid
+flowchart TD
+    user[User] --> renderer[MarkdownRenderer]
+    renderer --> plugins[StreamdownPlugins]
+    plugins --> output[StyledDocument]
+~~~
+`;
+
 function DesignSystemPage() {
 	return (
 		<div className="space-y-6">
@@ -482,6 +521,7 @@ function DesignSystemPage() {
 				<TimelineShowcase />
 				<TourShowcase />
 				<SidebarShowcase />
+				<MarkdownShowcase />
 				<AiElementsShowcase />
 				<TypographyShowcase />
 			</div>
@@ -644,7 +684,7 @@ function FormShowcase() {
 			<div className="space-y-5">
 				<div className="space-y-2">
 					<Label htmlFor="ds-project-name">Project name</Label>
-					<Input id="ds-project-name" placeholder="Bubbly Dragon" />
+					<Input id="ds-project-name" placeholder={PROJECT_NAME} />
 				</div>
 				<div className="space-y-2">
 					<Label htmlFor="ds-notes">Notes</Label>
@@ -1270,7 +1310,7 @@ function DisplayShowcase() {
 				<div className="flex flex-wrap items-center gap-4">
 					<Avatar>
 						<AvatarImage alt="Avatar" src="https://i.pravatar.cc/80?img=12" />
-						<AvatarFallback>BD</AvatarFallback>
+						<AvatarFallback>{PROJECT_INITIALS}</AvatarFallback>
 					</Avatar>
 					<div className="w-full max-w-48 overflow-hidden rounded-2xl border border-border/70">
 						<AspectRatio ratio={16 / 9}>
@@ -2078,7 +2118,7 @@ function SidebarShowcase() {
 						<SidebarHeader>
 							<div className="rounded-2xl border border-sidebar-border bg-sidebar-accent px-3 py-3 text-sidebar-accent-foreground">
 								<p className="text-sm font-semibold tracking-tight">
-									Bubbly Dragon
+									{PROJECT_NAME}
 								</p>
 							</div>
 						</SidebarHeader>
@@ -2103,7 +2143,7 @@ function SidebarShowcase() {
 								<div className="flex items-center justify-between gap-3">
 									<div className="flex items-center gap-3">
 										<Avatar className="size-9">
-											<AvatarFallback>BD</AvatarFallback>
+											<AvatarFallback>{PROJECT_INITIALS}</AvatarFallback>
 										</Avatar>
 										<div>
 											<p className="text-sm font-medium">Operator</p>
@@ -2164,6 +2204,30 @@ function AiElementsShowcase() {
 					<div className="min-h-[42rem]">
 						<ExampleChatbot />
 					</div>
+				</div>
+			</div>
+		</ShowcaseCard>
+	);
+}
+
+function MarkdownShowcase() {
+	return (
+		<ShowcaseCard
+			className="border-border/70 xl:col-span-2"
+			description="Streamdown rendered as a reusable markdown document component rather than only inside chat UI."
+			title="Markdown"
+		>
+			<div className="space-y-3">
+				<div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
+					<Badge variant="secondary">Streamdown</Badge>
+					<Badge variant="outline">Document renderer</Badge>
+					<span>
+						Use this surface for docs, knowledge pages, and any product area
+						that needs polished markdown output.
+					</span>
+				</div>
+				<div className="overflow-hidden rounded-2xl border border-border/70 bg-background/70 p-6">
+					<MarkdownRenderer>{markdownShowcaseDocument}</MarkdownRenderer>
 				</div>
 			</div>
 		</ShowcaseCard>

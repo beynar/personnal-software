@@ -1,6 +1,26 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Building2, ChevronRight, Settings2 } from "lucide-react";
-import { CreateOrganizationDialog } from "~/components/organizations/create-organization-dialog";
+import {
+	Building2,
+	Camera,
+	ChevronRight,
+	Clock3,
+	Loader2,
+	MailPlus,
+	Settings2,
+	Trash2,
+	X,
+} from "lucide-react";
+import {
+	type ChangeEvent,
+	type FormEvent,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
 	Card,
@@ -9,6 +29,16 @@ import {
 	CardHeader,
 	CardTitle,
 } from "~/components/ui/card";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Separator } from "~/components/ui/separator";
 import { authClient } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/dashboard/organization-settings")({
@@ -18,6 +48,106 @@ export const Route = createFileRoute("/dashboard/organization-settings")({
 function OrganizationSettingsPage() {
 	const { data: activeOrganization, isPending } =
 		authClient.useActiveOrganization();
+	const [draft, setDraft] = useState(
+		createOrganizationDraft(activeOrganization),
+	);
+	const [inviteEmail, setInviteEmail] = useState("");
+	const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+	const [isSaving, setIsSaving] = useState(false);
+	const [isInviting, setIsInviting] = useState(false);
+	const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+	const [processingInvitationId, setProcessingInvitationId] = useState<
+		string | null
+	>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const organizationId = activeOrganization?.id;
+	const [organizationInvitations, setOrganizationInvitations] = useState<
+		InvitationLike[]
+	>([]);
+	const [loadingOrganizationInvitations, setLoadingOrganizationInvitations] =
+		useState(false);
+
+	const loadOrganizationInvitations = useCallback(async () => {
+		if (!organizationId) {
+			setOrganizationInvitations([]);
+			return;
+		}
+
+		setLoadingOrganizationInvitations(true);
+		try {
+			const { data, error } = await authClient.organization.listInvitations({
+				query: { organizationId },
+			});
+			if (error) {
+				throw new Error(error.message ?? "Failed to load invitations");
+			}
+			setOrganizationInvitations(
+				normalizeCollection<InvitationLike>(data).filter(isInvitationLike),
+			);
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to load invitations",
+			);
+		} finally {
+			setLoadingOrganizationInvitations(false);
+		}
+	}, [organizationId]);
+
+	useEffect(() => {
+		setDraft(createOrganizationDraft(activeOrganization));
+	}, [activeOrganization]);
+
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			if (cancelled) {
+				return;
+			}
+			await loadOrganizationInvitations();
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [loadOrganizationInvitations]);
+
+	const hasChanges =
+		!!activeOrganization && hasOrganizationChanges(draft, activeOrganization);
+	const isFormDisabled = isSaving || isUploadingLogo;
+
+	async function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
+		const file = event.target.files?.[0];
+		if (!file) {
+			return;
+		}
+
+		const validationError = validateOrganizationLogoFile(file);
+		if (validationError) {
+			toast.error(validationError);
+			event.target.value = "";
+			return;
+		}
+
+		setIsUploadingLogo(true);
+
+		try {
+			const logo = await convertImageFileToDataUrl(file);
+			setDraft((currentDraft) => ({
+				...currentDraft,
+				logo,
+			}));
+			toast.success("Organization picture updated");
+		} catch (error) {
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to update organization picture",
+			);
+		} finally {
+			setIsUploadingLogo(false);
+			event.target.value = "";
+		}
+	}
 
 	if (isPending) {
 		return (
@@ -71,7 +201,7 @@ function OrganizationSettingsPage() {
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
 			<Card className="overflow-hidden border-border/70">
 				<CardHeader className="gap-3 border-b border-border/70 bg-card/70">
 					<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -83,63 +213,519 @@ function OrganizationSettingsPage() {
 							{activeOrganization.name}
 						</CardTitle>
 						<CardDescription className="max-w-2xl text-sm leading-6">
-							This page reflects the organization currently active in the
-							sidebar. Use the switcher above to change context or create a new
-							organization.
+							Update the active organization profile and manage teammate
+							invitations from one place.
 						</CardDescription>
 					</div>
 				</CardHeader>
-				<CardContent className="grid gap-4 p-4 md:grid-cols-2">
-					<DetailCard
-						label="Organization name"
-						value={activeOrganization.name}
-					/>
-					<DetailCard
-						label="Organization slug"
-						value={activeOrganization.slug}
-					/>
-					<DetailCard
-						label="Created"
-						value={formatCreatedAt(activeOrganization.createdAt)}
-					/>
+				<CardContent className="p-6">
+					<form
+						className="space-y-6"
+						onSubmit={(event) =>
+							void handleSaveOrganization(event, {
+								activeOrganization,
+								draft,
+								onSaved: async () => {},
+								setIsSaving,
+							})
+						}
+					>
+						<div className="space-y-4 rounded-2xl border border-border/70 bg-background/70 p-4">
+							<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+								<div className="flex items-center gap-4">
+									<Avatar className="size-18 border border-border/70" size="lg">
+										<AvatarImage
+											alt={draft.name.trim() || activeOrganization.name}
+											src={draft.logo || activeOrganization.logo || undefined}
+										/>
+										<AvatarFallback>
+											{getInitials(draft.name || activeOrganization.name)}
+										</AvatarFallback>
+									</Avatar>
+									<div className="space-y-1">
+										<p className="font-medium text-foreground">
+											Organization picture
+										</p>
+										<p className="text-sm text-muted-foreground">
+											Upload a square image for the cleanest result. PNG, JPG,
+											or WebP up to 5 MB.
+										</p>
+									</div>
+								</div>
+								<Badge variant="outline">
+									Created {formatCreatedAt(activeOrganization.createdAt)}
+								</Badge>
+							</div>
+							<div className="flex flex-wrap gap-3">
+								<input
+									accept="image/*"
+									className="hidden"
+									disabled={isFormDisabled}
+									onChange={handleLogoChange}
+									ref={fileInputRef}
+									type="file"
+								/>
+								<Button
+									disabled={isFormDisabled}
+									onClick={() => fileInputRef.current?.click()}
+									type="button"
+									variant="outline"
+								>
+									<Camera className="size-4" />
+									<span>
+										{isUploadingLogo
+											? "Uploading…"
+											: draft.logo || activeOrganization.logo
+												? "Change photo"
+												: "Upload photo"}
+									</span>
+								</Button>
+								<Button
+									disabled={isFormDisabled || !draft.logo}
+									onClick={() =>
+										setDraft((currentDraft) => ({
+											...currentDraft,
+											logo: "",
+										}))
+									}
+									type="button"
+									variant="ghost"
+								>
+									<Trash2 className="size-4" />
+									Remove image
+								</Button>
+							</div>
+						</div>
+						<FieldGroup>
+							<Field>
+								<FieldContent>
+									<FieldLabel htmlFor="organization-name">Name</FieldLabel>
+									<Input
+										disabled={isFormDisabled}
+										id="organization-name"
+										maxLength={80}
+										onChange={(event) =>
+											setDraft((currentDraft) => ({
+												...currentDraft,
+												name: event.target.value,
+											}))
+										}
+										placeholder="Northwind Studio"
+										value={draft.name}
+									/>
+									<FieldDescription>
+										Shown in the switcher and member-facing organization UI.
+									</FieldDescription>
+								</FieldContent>
+							</Field>
+							<Field>
+								<FieldContent>
+									<FieldLabel htmlFor="organization-slug">Slug</FieldLabel>
+									<Input
+										autoCapitalize="none"
+										disabled={isFormDisabled}
+										id="organization-slug"
+										maxLength={80}
+										onChange={(event) =>
+											setDraft((currentDraft) => ({
+												...currentDraft,
+												slug: event.target.value,
+											}))
+										}
+										placeholder="northwind-studio"
+										value={draft.slug}
+									/>
+									<FieldDescription>
+										Slug changes are optional but keep workspace URLs readable.
+									</FieldDescription>
+								</FieldContent>
+							</Field>
+						</FieldGroup>
+						<div className="flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-end">
+							<div className="flex gap-3">
+								<Button
+									disabled={isFormDisabled || !hasChanges}
+									onClick={() =>
+										setDraft(createOrganizationDraft(activeOrganization))
+									}
+									type="button"
+									variant="outline"
+								>
+									Reset
+								</Button>
+								<Button disabled={isFormDisabled || !hasChanges} type="submit">
+									{isSaving ? "Saving..." : "Save organization"}
+								</Button>
+							</div>
+						</div>
+					</form>
 				</CardContent>
 			</Card>
-			<Card className="border-border/70">
-				<CardHeader className="gap-2 border-b border-border/70 bg-card/70">
-					<CardTitle className="text-lg">Management</CardTitle>
-					<CardDescription>
-						Organization switching and creation live in the sidebar switcher so
-						the shell stays the single source of truth.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="p-4">
-					<div className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/70 p-4">
-						<div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
-							<Building2 className="size-4" />
+			<div className="space-y-6">
+				<Card className="border-border/70">
+					<CardHeader className="gap-2 border-b border-border/70 bg-card/70">
+						<CardTitle className="text-lg">Invite teammates</CardTitle>
+						<CardDescription>
+							Send organization invitations without leaving the current
+							workspace.
+						</CardDescription>
+					</CardHeader>
+					<CardContent className="space-y-4 p-6">
+						<form
+							className="space-y-4"
+							onSubmit={(event) =>
+								void handleInviteMember(event, {
+									inviteEmail,
+									inviteRole,
+									organizationId: activeOrganization.id,
+									onInvited: async () => {
+										setInviteEmail("");
+										await loadOrganizationInvitations();
+									},
+									setIsInviting,
+								})
+							}
+						>
+							<div className="space-y-2">
+								<Label htmlFor="invite-email">Email</Label>
+								<Input
+									autoCapitalize="none"
+									disabled={isInviting}
+									id="invite-email"
+									onChange={(event) => setInviteEmail(event.target.value)}
+									placeholder="teammate@example.com"
+									type="email"
+									value={inviteEmail}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="invite-role">Role</Label>
+								<select
+									className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+									disabled={isInviting}
+									id="invite-role"
+									onChange={(event) =>
+										setInviteRole(event.target.value as "member" | "admin")
+									}
+									value={inviteRole}
+								>
+									<option value="member">Member</option>
+									<option value="admin">Admin</option>
+								</select>
+							</div>
+							<Button
+								disabled={isInviting || !inviteEmail.trim()}
+								type="submit"
+								className="w-full"
+							>
+								{isInviting ? (
+									<Loader2 className="size-4 animate-spin" />
+								) : (
+									<MailPlus className="size-4" />
+								)}
+								{isInviting ? "Sending..." : "Send invitation"}
+							</Button>
+						</form>
+						<Separator />
+						<div className="space-y-3">
+							<div className="flex items-center justify-between gap-3">
+								<div>
+									<p className="font-medium text-foreground">
+										Outstanding invitations
+									</p>
+									<p className="text-sm text-muted-foreground">
+										Track invited emails and resend by inviting the same address
+										again.
+									</p>
+								</div>
+								<Badge variant="secondary">
+									{loadingOrganizationInvitations
+										? "Loading"
+										: `${organizationInvitations.length} total`}
+								</Badge>
+							</div>
+							{loadingOrganizationInvitations ? (
+								<LoadingState label="Loading invitations..." />
+							) : organizationInvitations.length ? (
+								<div className="space-y-3">
+									{organizationInvitations.map((invitation) => {
+										const invitationId = getInvitationId(invitation);
+										const isProcessing =
+											invitationId !== null &&
+											processingInvitationId === invitationId;
+										return (
+											<div
+												className="rounded-2xl border border-border/70 bg-background/70 p-4"
+												key={invitationId ?? invitation.email}
+											>
+												<div className="flex items-start justify-between gap-4">
+													<div className="min-w-0 space-y-1">
+														<p className="truncate font-medium text-foreground">
+															{invitation.email}
+														</p>
+														<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+															<Badge variant="outline">
+																{invitation.role ?? "member"}
+															</Badge>
+															<Badge variant="secondary">
+																{invitation.status}
+															</Badge>
+															<span>
+																Expires {formatCreatedAt(invitation.expiresAt)}
+															</span>
+														</div>
+													</div>
+													{invitationId ? (
+														<Button
+															disabled={isProcessing}
+															onClick={() =>
+																void handleCancelInvitation(invitationId, {
+																	onCompleted: async () => {
+																		await loadOrganizationInvitations();
+																	},
+																	setProcessingInvitationId,
+																})
+															}
+															size="sm"
+															type="button"
+															variant="ghost"
+														>
+															{isProcessing ? (
+																<Loader2 className="size-4 animate-spin" />
+															) : (
+																<X className="size-4" />
+															)}
+															Cancel
+														</Button>
+													) : null}
+												</div>
+											</div>
+										);
+									})}
+								</div>
+							) : (
+								<EmptyState
+									description="Invite collaborators from this page when you are ready to share access."
+									title="No pending invitations"
+								/>
+							)}
 						</div>
-						<div className="min-w-0 flex-1">
-							<p className="text-sm font-medium">
-								Switch or create organizations
-							</p>
-							<p className="text-sm text-muted-foreground">
-								Open the switcher at the top of the sidebar to change your
-								active organization or create another one.
-							</p>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
+					</CardContent>
+				</Card>
+			</div>
 		</div>
 	);
 }
 
-function DetailCard({ label, value }: { label: string; value: string }) {
+function LoadingState({ label }: { label: string }) {
 	return (
-		<div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-			<p className="text-sm font-medium text-muted-foreground">{label}</p>
-			<p className="mt-2 text-base font-medium text-foreground">{value}</p>
+		<div className="flex items-center justify-center rounded-2xl border border-dashed border-border/70 bg-background/70 px-4 py-8 text-sm text-muted-foreground">
+			<Loader2 className="mr-2 size-4 animate-spin" />
+			{label}
 		</div>
 	);
+}
+
+function EmptyState({
+	description,
+	title,
+}: {
+	description: string;
+	title: string;
+}) {
+	return (
+		<div className="rounded-2xl border border-dashed border-border/70 bg-background/70 p-6 text-center">
+			<div className="mx-auto flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+				<Clock3 className="size-4" />
+			</div>
+			<p className="mt-4 font-medium text-foreground">{title}</p>
+			<p className="mt-1 text-sm leading-6 text-muted-foreground">
+				{description}
+			</p>
+		</div>
+	);
+}
+
+type OrganizationDraft = {
+	logo: string;
+	name: string;
+	slug: string;
+};
+
+type OrganizationLike = {
+	createdAt?: Date | string | number | null;
+	id: string;
+	logo?: string | null;
+	name: string;
+	slug: string;
+};
+
+type InvitationLike = {
+	email: string;
+	expiresAt?: Date | string | number | null;
+	id?: string;
+	invitationId?: string;
+	organizationId?: string | null;
+	organizationName?: string | null;
+	organizationSlug?: string | null;
+	role?: string | null;
+	status?: string | null;
+};
+
+function createOrganizationDraft(
+	organization: OrganizationLike | null | undefined,
+) {
+	return {
+		logo: organization?.logo ?? "",
+		name: organization?.name ?? "",
+		slug: organization?.slug ?? "",
+	} satisfies OrganizationDraft;
+}
+
+function hasOrganizationChanges(
+	draft: OrganizationDraft,
+	organization: OrganizationLike,
+) {
+	return (
+		draft.name.trim() !== organization.name ||
+		draft.slug.trim() !== organization.slug ||
+		normalizeOptionalString(draft.logo) !== (organization.logo ?? undefined)
+	);
+}
+
+async function handleSaveOrganization(
+	event: FormEvent<HTMLFormElement>,
+	{
+		activeOrganization,
+		draft,
+		onSaved,
+		setIsSaving,
+	}: {
+		activeOrganization: OrganizationLike;
+		draft: OrganizationDraft;
+		onSaved: () => Promise<void>;
+		setIsSaving: (value: boolean) => void;
+	},
+) {
+	event.preventDefault();
+	setIsSaving(true);
+
+	try {
+		const { error } = await authClient.organization.update({
+			data: {
+				logo: normalizeOptionalString(draft.logo),
+				name: draft.name.trim(),
+				slug: draft.slug.trim(),
+			},
+			organizationId: activeOrganization.id,
+		});
+
+		if (error) {
+			throw new Error(error.message ?? "Failed to update organization");
+		}
+
+		await onSaved();
+		toast.success("Organization updated");
+	} catch (error) {
+		toast.error(
+			error instanceof Error ? error.message : "Failed to update organization",
+		);
+	} finally {
+		setIsSaving(false);
+	}
+}
+
+async function handleInviteMember(
+	event: FormEvent<HTMLFormElement>,
+	{
+		inviteEmail,
+		inviteRole,
+		organizationId,
+		onInvited,
+		setIsInviting,
+	}: {
+		inviteEmail: string;
+		inviteRole: "member" | "admin";
+		organizationId: string;
+		onInvited: () => Promise<void>;
+		setIsInviting: (value: boolean) => void;
+	},
+) {
+	event.preventDefault();
+	setIsInviting(true);
+
+	try {
+		const { error } = await authClient.organization.inviteMember({
+			email: inviteEmail.trim(),
+			organizationId,
+			resend: true,
+			role: inviteRole,
+		});
+		if (error) {
+			throw new Error(error.message ?? "Failed to send invitation");
+		}
+
+		await onInvited();
+		toast.success("Invitation sent");
+	} catch (error) {
+		toast.error(
+			error instanceof Error ? error.message : "Failed to send invitation",
+		);
+	} finally {
+		setIsInviting(false);
+	}
+}
+
+async function handleCancelInvitation(
+	invitationId: string,
+	{
+		onCompleted,
+		setProcessingInvitationId,
+	}: {
+		onCompleted: () => Promise<void>;
+		setProcessingInvitationId: (value: string | null) => void;
+	},
+) {
+	setProcessingInvitationId(invitationId);
+
+	try {
+		await authClient.organization.cancelInvitation({ invitationId });
+		await onCompleted();
+		toast.success("Invitation cancelled");
+	} catch (error) {
+		toast.error(
+			error instanceof Error ? error.message : "Failed to cancel invitation",
+		);
+	} finally {
+		setProcessingInvitationId(null);
+	}
+}
+
+function normalizeCollection<T>(
+	value: T[] | { data?: T[] } | undefined | null,
+) {
+	if (Array.isArray(value)) {
+		return value;
+	}
+	return value?.data ?? [];
+}
+
+function isInvitationLike(value: unknown): value is InvitationLike {
+	if (!value || typeof value !== "object") {
+		return false;
+	}
+
+	const record = value as Record<string, unknown>;
+	return typeof record.email === "string";
+}
+
+function getInvitationId(invitation: InvitationLike) {
+	return invitation.id ?? invitation.invitationId ?? null;
+}
+
+function normalizeOptionalString(value: string) {
+	const trimmed = value.trim();
+	return trimmed ? trimmed : undefined;
 }
 
 function formatCreatedAt(createdAt: Date | string | number | null | undefined) {
@@ -150,4 +736,89 @@ function formatCreatedAt(createdAt: Date | string | number | null | undefined) {
 	return new Intl.DateTimeFormat("en", {
 		dateStyle: "long",
 	}).format(new Date(createdAt));
+}
+
+function getInitials(value: string | undefined) {
+	if (!value) {
+		return "O";
+	}
+
+	const parts = value.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+	if (!parts.length) {
+		return "O";
+	}
+
+	return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+function validateOrganizationLogoFile(file: File) {
+	if (!file.type.startsWith("image/")) {
+		return "Choose an image file";
+	}
+
+	if (file.size > 5 * 1024 * 1024) {
+		return "Organization images must be 5 MB or smaller";
+	}
+
+	return null;
+}
+
+async function convertImageFileToDataUrl(file: File) {
+	const image = await loadImageFromFile(file);
+	const maxDimension = 512;
+	const scale = Math.min(
+		1,
+		maxDimension /
+			Math.max(
+				image.naturalWidth || image.width,
+				image.naturalHeight || image.height,
+			),
+	);
+	const width = Math.max(
+		1,
+		Math.round((image.naturalWidth || image.width) * scale),
+	);
+	const height = Math.max(
+		1,
+		Math.round((image.naturalHeight || image.height) * scale),
+	);
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+
+	const context = canvas.getContext("2d");
+	if (!context) {
+		throw new Error("Image processing is unavailable in this browser");
+	}
+
+	context.drawImage(image, 0, 0, width, height);
+
+	let lastDataUrl = "";
+	for (const quality of [0.9, 0.82, 0.74, 0.66]) {
+		lastDataUrl = canvas.toDataURL("image/webp", quality);
+		if (lastDataUrl.length <= 500_000) {
+			return lastDataUrl;
+		}
+	}
+
+	if (lastDataUrl.length > 900_000) {
+		throw new Error("Choose a smaller image");
+	}
+
+	return lastDataUrl;
+}
+
+async function loadImageFromFile(file: File) {
+	const objectUrl = URL.createObjectURL(file);
+
+	try {
+		return await new Promise<HTMLImageElement>((resolve, reject) => {
+			const image = new Image();
+			image.onload = () => resolve(image);
+			image.onerror = () => reject(new Error("Failed to read image"));
+			image.src = objectUrl;
+		});
+	} finally {
+		URL.revokeObjectURL(objectUrl);
+	}
 }
