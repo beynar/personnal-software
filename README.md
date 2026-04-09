@@ -31,7 +31,7 @@ For a fresh clone, follow [BOOTSTRAP.md](./BOOTSTRAP.md) before doing anything e
 
 ```bash
 git clone <repo-url>
-cd bubbly-dragon
+cd personnal-software
 npm install
 ```
 

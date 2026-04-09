@@ -16,7 +16,7 @@ they want built on top of the template.
 
 Use this repository as the base:
 
-`https://github.com/beynar/bubbly-dragon`
+`https://github.com/beynar/personnal-software`
 
 ## Workspace rule
 
@@ -26,7 +26,7 @@ the project root.
 - Put the template files at the root of the current working directory.
 - Do not create a nested subfolder inside the current workspace.
 - If the current directory is empty, clone directly into it, for example by
-  using `git clone https://github.com/beynar/bubbly-dragon .`.
+  using `git clone https://github.com/beynar/personnal-software .`.
 - If the current directory cannot be cloned into directly, clone into a
   temporary location and copy the template contents into the current root
   without leaving the project nested in a child folder.

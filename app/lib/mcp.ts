@@ -12,7 +12,7 @@ import {
 } from "~/lib/openapi-catalog";
 
 export const MCP_SERVER_INFO = {
-	name: "bubbly-dragon",
+	name: "personnal-software",
 	version: "1.0.0",
 } as const;
 
