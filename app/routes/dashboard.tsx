@@ -11,6 +11,7 @@ import {
 	BookOpen,
 	Building2,
 	ChevronsUpDown,
+	Command,
 	Copy,
 	Home,
 	Key,
@@ -28,6 +29,16 @@ import { OrganizationSwitcher } from "~/components/organizations/organization-sw
 import { PendingInvitationsDrawer } from "~/components/organizations/pending-invitations-drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
+import {
+	CommandDialog,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+	CommandSeparator,
+	CommandShortcut,
+} from "~/components/ui/command";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -80,6 +91,8 @@ function DashboardShell() {
 	const syncViewerProfile = useMutation(api.users.syncViewerProfile);
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
+	const [commandOpen, setCommandOpen] = useState(false);
+	const [theme, setTheme] = useState<"light" | "dark">("light");
 	const { data: activeOrganization, isPending: loadingActiveOrganization } =
 		authClient.useActiveOrganization();
 	const { data: organizations, isPending: loadingOrganizations } =
@@ -117,9 +130,58 @@ function DashboardShell() {
 		void syncViewerProfile();
 	}, [syncViewerProfile, user?._id]);
 
+	useEffect(() => {
+		const root = document.documentElement;
+		setTheme(root.classList.contains("dark") ? "dark" : "light");
+	}, []);
+
+	useEffect(() => {
+		function handleKeyDown(event: KeyboardEvent) {
+			if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
+				return;
+			}
+
+			const target = event.target;
+			if (
+				target instanceof HTMLElement &&
+				(target.isContentEditable ||
+					target instanceof HTMLInputElement ||
+					target instanceof HTMLTextAreaElement ||
+					target instanceof HTMLSelectElement)
+			) {
+				return;
+			}
+
+			event.preventDefault();
+			setCommandOpen(true);
+		}
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, []);
+
 	async function handleSignOut() {
 		await authClient.signOut();
 		navigate({ to: "/" });
+	}
+
+	async function handleCopyMcpUrl() {
+		const mcpUrl = `${window.location.origin}/api/mcp`;
+
+		try {
+			await navigator.clipboard.writeText(mcpUrl);
+			toast.success("MCP URL copied");
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to copy MCP URL",
+			);
+		}
+	}
+
+	function applyTheme(nextTheme: "light" | "dark") {
+		document.documentElement.classList.toggle("dark", nextTheme === "dark");
+		window.localStorage.setItem("theme", nextTheme);
+		setTheme(nextTheme);
 	}
 
 	return (
@@ -149,14 +211,125 @@ function DashboardShell() {
 			</Sidebar>
 			<SidebarInset>
 				<header className="sticky top-0 z-10 border-b border-border/70 bg-background/95 backdrop-blur h-18">
-					<div className="flex items-center gap-3 px-4 py-4 sm:px-6">
+					<div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
+						<div className="flex items-center gap-3">
 						<SidebarTrigger />
-						<div className="min-w-0">
-							<p className="text-sm font-medium text-foreground">Dashboard</p>
-							<p className="truncate text-sm text-muted-foreground">
-								Starter workspace with a persistent shell and nested pages
-							</p>
+							<div className="min-w-0">
+								<p className="text-sm font-medium text-foreground">Dashboard</p>
+								<p className="truncate text-sm text-muted-foreground">
+									Starter workspace with a persistent shell and nested pages
+								</p>
+							</div>
 						</div>
+						<Button
+							className="h-10 min-w-[13rem] justify-between rounded-xl border-border/70 px-3 text-muted-foreground"
+							onClick={() => setCommandOpen(true)}
+							type="button"
+							variant="outline"
+						>
+							<span className="flex items-center gap-2">
+								<Command className="size-4" />
+								<span className="text-sm">Search commands</span>
+							</span>
+							<CommandShortcut className="ml-3 hidden sm:inline-flex">
+								⌘K
+							</CommandShortcut>
+						</Button>
+						<CommandDialog
+							description="Search navigation and workspace actions."
+							onOpenChange={setCommandOpen}
+							open={commandOpen}
+							title="Dashboard commands"
+						>
+							<CommandInput placeholder="Search commands..." />
+							<CommandList>
+								<CommandEmpty>No results found.</CommandEmpty>
+								<CommandGroup heading="Navigation">
+									<CommandItem
+										onSelect={() => {
+											setCommandOpen(false);
+											void navigate({ to: "/dashboard" });
+										}}
+									>
+										<Home className="size-4" />
+										Overview
+									</CommandItem>
+									<CommandItem
+										onSelect={() => {
+											setCommandOpen(false);
+											void navigate({ to: "/dashboard/design-system" });
+										}}
+									>
+										<Layers3 className="size-4" />
+										Design System
+									</CommandItem>
+									<CommandItem
+										onSelect={() => {
+											setCommandOpen(false);
+											void navigate({ to: "/dashboard/profile" });
+										}}
+									>
+										<UserRound className="size-4" />
+										Profile
+									</CommandItem>
+									{activeOrganization ? (
+										<CommandItem
+											onSelect={() => {
+												setCommandOpen(false);
+												void navigate({
+													to: "/dashboard/organization-settings",
+												});
+											}}
+										>
+											<Building2 className="size-4" />
+											Organization settings
+										</CommandItem>
+									) : null}
+								</CommandGroup>
+								<CommandSeparator />
+								<CommandGroup heading="Actions">
+									{theme === "dark" ? (
+										<CommandItem
+											onSelect={() => {
+												setCommandOpen(false);
+												applyTheme("light");
+											}}
+										>
+											<Sun className="size-4" />
+											Light mode
+										</CommandItem>
+									) : (
+										<CommandItem
+											onSelect={() => {
+												setCommandOpen(false);
+												applyTheme("dark");
+											}}
+										>
+											<Moon className="size-4" />
+											Dark mode
+										</CommandItem>
+									)}
+									<CommandItem
+										onSelect={() => {
+											setCommandOpen(false);
+											void handleCopyMcpUrl();
+										}}
+									>
+										<Copy className="size-4" />
+										Copy MCP URL
+									</CommandItem>
+									<CommandItem
+										onSelect={() => {
+											setCommandOpen(false);
+											void handleSignOut();
+										}}
+									>
+										<LogOut className="size-4" />
+										Sign out
+									</CommandItem>
+								</CommandGroup>
+							</CommandList>
+						</CommandDialog>
 					</div>
 				</header>
 				<div className="flex flex-1 flex-col px-4 py-6 sm:px-6">

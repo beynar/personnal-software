@@ -6,8 +6,9 @@ You are starting from a template repository, not from scratch.
 
 Do not ask the user what to build yet.
 
-First, scaffold and bootstrap the template in the current workspace, create the
-fresh Convex project, deploy the scaffold, and report the deployment details.
+First, scaffold and bootstrap the template in the current workspace, create a
+new Convex deployment dedicated to this app, deploy the scaffold, and report
+the deployment details.
 Only after that should you use the `AskUserQuestion` tool to ask the user what
 they want built on top of the template.
 
@@ -46,13 +47,15 @@ the project root.
    - `UI_SYSTEM.md`
    - `convex/_generated/ai/guidelines.md`
 3. Bootstrap the template exactly as instructed by the repository.
-4. During bootstrap, create a fresh Convex project or deployment for this app instead of reusing an unrelated existing one.
+4. During bootstrap, create a new Convex deployment dedicated to this app.
+   - Do not attach this app to an unrelated existing Convex project or deployment.
+   - Record the Convex deployment identifier and the Convex dashboard URL for the deployment you created.
 5. Configure Cloudflare exactly as the repository expects.
 6. Confirm the scaffold runs locally.
 7. Deploy the scaffold to Cloudflare right away by following the repository's documented deployment flow.
 8. Once deployed, immediately give the user:
    - the deployed Cloudflare app URL
-   - the Convex dashboard URL for the fresh Convex project created for this app
+   - the Convex dashboard URL for the new Convex deployment created for this app
    - the temporary `SUPER_ADMIN_SIGNUP_PASSWORD`
 9. After that, use the `AskUserQuestion` tool to ask the user what they want built from the template.
 10. Implement the requested product on top of the template.
@@ -84,7 +87,7 @@ Example acceptable temporary password:
 - Do not expose internal setup docs in the user-facing app.
 - Do not commit secrets.
 - Deployment is required. Follow the repo's Wrangler and Cloudflare instructions exactly.
-- The Convex URL given back to the user must be the Convex dashboard URL for the fresh project created during bootstrap, not just the public `VITE_CONVEX_URL`.
+- The Convex URL given back to the user must be the Convex dashboard URL for the new deployment created during bootstrap, not just the public `VITE_CONVEX_URL`.
 
 ## How to work
 
@@ -108,10 +111,11 @@ Before asking the user what to build, explicitly confirm:
 - the docs were read
 - the bootstrap succeeded
 - the app runs locally
-- a fresh Convex project was created for this app
+- a new Convex deployment dedicated to this app was created
+- the Convex deployment identifier for that new deployment
 - the app was deployed to Cloudflare
 - the deployed Cloudflare app URL
-- the Convex dashboard URL for the fresh Convex project
+- the Convex dashboard URL for the new Convex deployment
 - which temporary `SUPER_ADMIN_SIGNUP_PASSWORD` was set
 
 Then ask the user what they want built.

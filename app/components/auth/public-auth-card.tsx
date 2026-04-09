@@ -12,6 +12,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { authClient } from "~/lib/auth-client";
+import { ensureOrganizationForSession } from "~/lib/organization";
 import { PROJECT_NAME } from "~/lib/project";
 
 export function PublicAuthCard({
@@ -64,6 +65,7 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				setError(authError.message ?? "Failed to sign in");
 				return;
 			}
+			await ensureOrganizationForSession(authClient, { email });
 			if (onAuthSuccess) {
 				onAuthSuccess();
 			} else {
@@ -141,6 +143,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				setError(authError.message ?? "Failed to create account");
 				return;
 			}
+			await ensureOrganizationForSession(authClient, { email, name });
 			if (onAuthSuccess) {
 				onAuthSuccess();
 			} else {

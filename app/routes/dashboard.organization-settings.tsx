@@ -82,7 +82,9 @@ function OrganizationSettingsPage() {
 				throw new Error(error.message ?? "Failed to load invitations");
 			}
 			setOrganizationInvitations(
-				normalizeCollection<InvitationLike>(data).filter(isInvitationLike),
+				normalizeCollection<InvitationLike>(data)
+					.filter(isInvitationLike)
+					.filter(isOutstandingInvitation),
 			);
 		} catch (error) {
 			toast.error(
@@ -483,6 +485,7 @@ function OrganizationSettingsPage() {
 																	onCompleted: async () => {
 																		await loadOrganizationInvitations();
 																	},
+																	setOrganizationInvitations,
 																	setProcessingInvitationId,
 																})
 															}
@@ -680,16 +683,30 @@ async function handleCancelInvitation(
 	invitationId: string,
 	{
 		onCompleted,
+		setOrganizationInvitations,
 		setProcessingInvitationId,
 	}: {
 		onCompleted: () => Promise<void>;
+		setOrganizationInvitations: React.Dispatch<
+			React.SetStateAction<InvitationLike[]>
+		>;
 		setProcessingInvitationId: (value: string | null) => void;
 	},
 ) {
 	setProcessingInvitationId(invitationId);
 
 	try {
-		await authClient.organization.cancelInvitation({ invitationId });
+		const { error } = await authClient.organization.cancelInvitation({
+			invitationId,
+		});
+		if (error) {
+			throw new Error(error.message ?? "Failed to cancel invitation");
+		}
+		setOrganizationInvitations((currentInvitations) =>
+			currentInvitations.filter(
+				(invitation) => getInvitationId(invitation) !== invitationId,
+			),
+		);
 		await onCompleted();
 		toast.success("Invitation cancelled");
 	} catch (error) {
@@ -721,6 +738,11 @@ function isInvitationLike(value: unknown): value is InvitationLike {
 
 function getInvitationId(invitation: InvitationLike) {
 	return invitation.id ?? invitation.invitationId ?? null;
+}
+
+function isOutstandingInvitation(invitation: InvitationLike) {
+	const status = invitation.status?.toLowerCase();
+	return !status || !["accepted", "canceled", "cancelled", "declined", "expired", "rejected"].includes(status);
 }
 
 function normalizeOptionalString(value: string) {

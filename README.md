@@ -108,6 +108,26 @@ npm run deploy
 └── package.json                # Dependencies and scripts
 ```
 
+## How The Starter Is Layered
+
+This starter is organized around a few clear boundaries:
+
+- `app/routes/*` handles page routing, page composition, redirects, and HTTP entrypoints
+- `app/components/*` handles feature UI, while `app/components/ui/*` is reserved for reusable primitives
+- `convex/*` holds persistent data, business logic, ownership checks, and application APIs
+- `app/lib/api.ts` exposes the REST/OpenAPI surface for machine-readable HTTP access
+- `app/lib/mcp.ts` keeps the MCP layer thin by deriving route discovery and execution from the OpenAPI catalog instead of hand-writing one MCP tool per route
+- Better Auth provides the auth boundary across browser sessions, API keys, REST access, and MCP access
+
+In practice, that means:
+
+- add user-facing pages in `app/routes/`
+- add durable product logic in `convex/`
+- expose machine-facing routes through the OpenAPI-backed API layer
+- let MCP discover and execute those capabilities through the OpenAPI-driven bridge
+
+The intended flow is: UI routes compose product features, Convex owns core data rules, OpenAPI exposes machine-facing routes, and MCP gives LLMs a thin programmable layer over that documented API surface.
+
 ## Example Patterns
 
 ### Authentication (Login/Signup)
@@ -149,7 +169,10 @@ This repo exposes two machine interfaces: a REST API and an MCP server. Both req
 All REST endpoints require `Authorization: Bearer <api-key>`. Create an API key from the dashboard account menu.
 
 ```bash
-curl -H "Authorization: Bearer bd_your_key_here" https://your-app.example.com/api/v1/test
+curl -X POST "https://your-app.example.com/api/v1/examples/sample/workflow?q=widget&limit=5&dryRun=true&channel=email" \
+  -H "Authorization: Bearer bd_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"hello","priority":"high"}'
 ```
 
 The OpenAPI spec and interactive API reference are publicly accessible without a key:
@@ -184,31 +207,62 @@ The MCP server exposes two tools:
 
 | Tool | Description |
 |------|-------------|
-| `search-routes` | Searches the public OpenAPI route catalog by keyword |
+| `search-routes` | Searches the OpenAPI route catalog and returns compact route signatures |
 | `execute` | Executes JavaScript inside a Cloudflare dynamic worker sandbox |
+
+### OpenAPI-driven MCP model
+
+The MCP integration is intentionally driven by the OpenAPI spec:
+
+- OpenAPI is the source of truth for executable API capabilities
+- `search-routes` is derived from the current OpenAPI catalog and returns compact, LLM-friendly route signatures
+- `execute` builds the sandbox `api.*` proxy from the executable OpenAPI route catalog instead of from hand-written MCP tools
+- adding or changing an OpenAPI route updates route discovery automatically
+- route execution still depends on the proxy conventions documented below, plus host-side auth forwarding and request validation
+
+This keeps the MCP surface thin: route discovery happens through `search-routes`, and route orchestration happens inside `execute`.
 
 ### Sandboxed code execution
 
-The `execute` tool runs code through `DynamicWorkerExecutor` using the Cloudflare Worker loader binding. The caller sends JavaScript, the host runs it inside an isolated Worker sandbox, and the sandbox can only interact with the app through a recursive `api.*` proxy over the public OpenAPI routes.
+The `execute` tool runs code through `DynamicWorkerExecutor` using the Cloudflare Worker loader binding. The caller sends JavaScript, the host runs it inside an isolated Worker sandbox, and the sandbox can interact with executable OpenAPI routes through a recursive `api.*` proxy.
 
-Available sandbox routes:
+Route discovery stays at the MCP top level through `search-routes`, which returns compact text signatures with TypeScript-like `input` and `output` types.
 
-- `api.openapiJson.get()` — calls `GET /api/v1/openapi.json`
-- `api.docs.get()` — calls `GET /api/v1/docs`
+Proxy conventions:
 
-Route discovery stays at the MCP top level through `search-routes`. The sandbox itself does not get a separate search helper or any access to protected REST routes.
+- Static segments become chained properties, for example `POST /api/v1/examples/{exampleId}/workflow` becomes `api.examples.exampleId.workflow.post(...)`
+- Parameterized path segments become plain parameter-name properties, for example `POST /api/v1/examples/{exampleId}/workflow` becomes `api.examples.exampleId.workflow.post({ params: { exampleId: "sample" } })`
+- Route method calls accept an object with optional `params`, `query`, `headers`, and `body`
+
+Example route:
+
+- `POST /api/v1/examples/{exampleId}/workflow`
+
+This route is intentionally an OpenAPI/MCP example route. It combines:
+
+- a path param: `exampleId`
+- query params: `q`, `limit`, `dryRun`, `channel`
+- a JSON body: `message`, `priority`
+- a typed JSON response
+
+It exists to demonstrate the proxy and is safe to remove once real product routes cover the same patterns.
+
+Proxy example:
+
+- `await api.examples.exampleId.workflow.post({ params: { exampleId: "sample" }, query: { q: "widget", limit: 5, dryRun: true, channel: "email" }, body: { message: "hello", priority: "high" } })`
 
 ### Verification checklist
 
 After setting up auth and API keys, verify the following:
 
-- [ ] **Unauthenticated REST rejection**: `curl https://your-app.example.com/api/v1/test` returns `401`
-- [ ] **Authenticated REST success**: `curl -H "Authorization: Bearer bd_..." https://your-app.example.com/api/v1/test` returns `200`
+- [ ] **Unauthenticated REST rejection**: `curl -X POST "https://your-app.example.com/api/v1/examples/sample/workflow?q=widget&limit=5&dryRun=true&channel=email" -H "Content-Type: application/json" -d '{"message":"hello","priority":"high"}'` returns `401`
+- [ ] **Authenticated REST success**: `curl -X POST "https://your-app.example.com/api/v1/examples/sample/workflow?q=widget&limit=5&dryRun=true&channel=email" -H "Authorization: Bearer bd_..." -H "Content-Type: application/json" -d '{"message":"hello","priority":"high"}'` returns `200`
 - [ ] **Protected OpenAPI behavior**: `GET /api/v1/docs` loads the API reference without a key; making a request from the docs UI without a key shows a `401`
 - [ ] **Bearer MCP success**: An MCP client that completed the OAuth flow can call `tools/list` and `tools/call` on `/api/mcp`
 - [ ] **API-key MCP success**: `curl -X POST -H "x-api-key: bd_..." -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' https://your-app.example.com/api/mcp` returns the tool list
-- [ ] **search-routes tool**: Calling `search-routes` with `{"query":"openapi"}` returns `/api/v1/openapi.json`
-- [ ] **execute tool**: Calling `execute` with `{"code":"async () => await api.openapiJson.get()"}` returns the sandbox result envelope
+- [ ] **search-routes tool**: Calling `search-routes` with `{"query":"example, workflow, channel"}` returns the example route signature for `examples/{exampleId}/workflow`
+- [ ] **execute tool with body**: Calling `execute` with `{"code":"async () => await api.examples.exampleId.workflow.post({ params: { exampleId: \"sample\" }, query: { q: \"widget\", limit: 5, dryRun: true, channel: \"email\" }, body: { message: \"hello\", priority: \"high\" } })"}` returns the sandbox result envelope
+- [ ] **execute tool with full example route**: Calling `execute` with `{"code":"async () => await api.examples.exampleId.workflow.post({ params: { exampleId: \"sample\" }, query: { q: \"widget\", limit: 5, dryRun: true, channel: \"email\" }, body: { message: \"hello\", priority: \"high\" } })"}` returns the sandbox result envelope
 
 ## Available Scripts
 

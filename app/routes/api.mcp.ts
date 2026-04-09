@@ -2,7 +2,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { auth } from "~/lib/auth";
-import { MCP_SERVER_INFO, createAuthInfo, registerMcpTools } from "~/lib/mcp";
+import {
+	MCP_SERVER_INFO,
+	createAuthInfo,
+	createRestAuthHeaders,
+	registerMcpTools,
+} from "~/lib/mcp";
 
 const CORS_HEADERS = {
 	"Access-Control-Allow-Origin": "*",
@@ -67,7 +72,15 @@ async function handleAuthenticatedMcpRequest(
 		await server.connect(transport);
 		return withCors(
 			await transport.handleRequest(request, {
-				authInfo: createAuthInfo(session),
+				authInfo: {
+					...createAuthInfo(session),
+					extra: {
+						session,
+						restAuth: {
+							headers: createRestAuthHeaders(request.headers),
+						},
+					},
+				},
 			}),
 		);
 	} finally {

@@ -29,7 +29,7 @@ This app depends on:
 npm install
 ```
 
-## 2. Create or attach a Convex dev deployment
+## 2. Create a new Convex dev deployment for this app
 
 Run this from the repo root:
 
@@ -39,10 +39,16 @@ npx convex dev --once --typecheck disable
 
 Expected result:
 
-- Convex creates or connects to a dev deployment
+- Convex creates a new dev deployment dedicated to this app
+- you record the Convex deployment identifier for that new deployment
 - `.env.local` is written
 - `VITE_CONVEX_URL` is populated
-- you append `VITE_PROJECT_NAME` with the product name you want the template to show
+- you ensure `VITE_CONVEX_SITE_URL`, `VITE_SITE_URL`, and `VITE_PROJECT_NAME` are present before local auth testing
+
+Important:
+
+- Do not attach this app to an unrelated existing Convex project or deployment.
+- If the Convex CLI offers multiple existing deployments, create a new one for this app instead of picking an unrelated existing target.
 
 Verify:
 
@@ -50,15 +56,18 @@ Verify:
 cat .env.local
 ```
 
-You should see at least:
+You should see or add at least:
 
 ```env
 CONVEX_DEPLOYMENT=...
 VITE_CONVEX_URL=...
+VITE_CONVEX_SITE_URL=...
+VITE_SITE_URL="http://localhost:8888"
 VITE_PROJECT_NAME="Your Project Name"
 ```
 
-If `VITE_PROJECT_NAME` is missing, add it manually to `.env.local`. This value
+If `VITE_PROJECT_NAME`, `VITE_CONVEX_SITE_URL`, or `VITE_SITE_URL` is missing,
+add it manually to `.env.local` before local auth testing. `VITE_PROJECT_NAME`
 is used for the sign-in screen, the document title, and the dashboard brand.
 
 ## 3. Configure Better Auth environment variables
@@ -148,12 +157,17 @@ After creating an account, verify REST and MCP auth:
 2. Copy the raw key (shown once at creation time)
 3. Verify REST rejection without a key:
    ```bash
-   curl http://localhost:8888/api/v1/test
+   curl -X POST "http://localhost:8888/api/v1/examples/bootstrap/workflow?q=hello&limit=2&dryRun=true&channel=email" \
+     -H "Content-Type: application/json" \
+     -d '{"message":"Bootstrap","priority":"high"}'
    # expect 401
    ```
 4. Verify REST success with a key:
    ```bash
-   curl -H "Authorization: Bearer bd_your_key" http://localhost:8888/api/v1/test
+   curl -X POST "http://localhost:8888/api/v1/examples/bootstrap/workflow?q=hello&limit=2&dryRun=true&channel=email" \
+     -H "Authorization: Bearer bd_your_key" \
+     -H "Content-Type: application/json" \
+     -d '{"message":"Bootstrap","priority":"high"}'
    # expect 200 with JSON
    ```
 5. Verify API reference loads: open `http://localhost:8888/api/v1/docs`
@@ -166,7 +180,26 @@ After creating an account, verify REST and MCP auth:
    # expect JSON-RPC response with tool list
    ```
 
-The `execute` MCP tool runs JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox does not receive raw credentials. It only gets a host-exposed `api.*` recursive proxy and can only call the public routes `/api/v1/openapi.json` and `/api/v1/docs`, for example `api.openapiJson.get()` and `api.docs.get()`.
+The `execute` MCP tool runs JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox does not receive raw credentials directly; it gets a host-exposed `api.*` proxy over executable OpenAPI routes with auth forwarded by the host.
+
+Proxy conventions:
+
+- Static segments become chained properties, for example `api.examples.exampleId.workflow.post(...)`
+- Parameterized path segments become plain parameter-name properties, for example `api.examples.exampleId.workflow.post({ params: { exampleId: "sample" } })`
+- Route method calls accept an object with optional `params`, `query`, `headers`, and `body`
+
+Example route:
+
+```js
+async () =>
+  await api.examples.exampleId.workflow.post({
+    params: { exampleId: "sample" },
+    query: { q: "widget", limit: 5, dryRun: true, channel: "email" },
+    body: { message: "hello", priority: "high" },
+  })
+```
+
+This route is intentionally a removable example. It combines path params, query params, a JSON body, and a typed JSON response so the MCP/OpenAPI bridge can be exercised end-to-end before real product routes replace it.
 
 ## 7. Cloudflare deployment with Wrangler CLI
 

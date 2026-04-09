@@ -2,7 +2,13 @@ import { apiReference } from "@scalar/hono-api-reference";
 import { OpenAPIRoute, fromHono } from "chanfana";
 import { Hono } from "hono";
 import { z } from "zod";
-import { extractBearerApiKey, validateApiKey } from "~/lib/api-auth";
+import {
+	extractApiKey,
+	extractBearerApiKey,
+	validateApiKey,
+} from "~/lib/api-auth";
+import { auth } from "~/lib/auth";
+import { PROJECT_NAME } from "~/lib/project";
 
 const apiApp = new Hono().basePath("/api/v1");
 
@@ -14,22 +20,38 @@ apiApp.use("*", async (c, next) => {
 		return next();
 	}
 
-	const apiKey = extractBearerApiKey(c.req.raw);
-	if (!apiKey) {
+	const bearerApiKey = extractBearerApiKey(c.req.raw);
+	const headerApiKey = extractApiKey(c.req.raw);
+	const apiKeyAuth = bearerApiKey
+		? await validateApiKey(bearerApiKey)
+		: headerApiKey
+			? await validateApiKey(headerApiKey)
+			: null;
+
+	if (apiKeyAuth) {
+		c.set("user" as never, apiKeyAuth.user as never);
+		c.set("session" as never, apiKeyAuth.session as never);
+		return next();
+	}
+
+	const mcpSession = await auth.api
+		.getMcpSession({
+			headers: c.req.raw.headers,
+		})
+		.catch(() => null);
+
+	if (!mcpSession) {
 		return c.json(
-			{ error: "Missing Authorization: Bearer <api-key> header" },
+			{
+				error:
+					"Missing or invalid API credentials. Use Authorization: Bearer <api-key>, x-api-key, or MCP session auth.",
+			},
 			401,
 		);
 	}
 
-	const result = await validateApiKey(apiKey);
-	if (!result) {
-		return c.json({ error: "Invalid or expired API key" }, 401);
-	}
-
 	// Stash the authenticated user/session for downstream handlers
-	c.set("user" as never, result.user as never);
-	c.set("session" as never, result.session as never);
+	c.set("session" as never, mcpSession as never);
 	return next();
 });
 
@@ -38,7 +60,7 @@ const openapi = fromHono(apiApp, {
 	docs_url: null,
 	schema: {
 		info: {
-			title: "Bubbly Dragon API",
+			title: `${PROJECT_NAME} API`,
 			version: "1.0.0",
 		},
 		security: [{ bearerAuth: [] }],
@@ -55,20 +77,55 @@ const openapi = fromHono(apiApp, {
 	} as any,
 });
 
-class TestEndpoint extends OpenAPIRoute {
+class ExampleWorkflowEndpoint extends OpenAPIRoute {
 	schema = {
-		summary: "Test endpoint",
+		summary: "Example workflow route",
 		description:
-			"Returns a simple success response to verify the API is running.",
+			"Example route for MCP and OpenAPI integration. It intentionally combines path params, query params, a JSON body, and a typed response so LLMs can learn the proxy shape from one route. Remove it once real product routes are available.",
+		request: {
+			params: z.object({
+				exampleId: z.string().min(1),
+			}),
+			query: z.object({
+				q: z.string().min(1),
+				limit: z.number().int().min(1).max(20).default(10),
+				dryRun: z.boolean().default(false),
+				channel: z.enum(["email", "sms", "push"]).default("email"),
+			}),
+			body: {
+				required: true,
+				content: {
+					"application/json": {
+						schema: z.object({
+							message: z.string().min(1),
+							priority: z.enum(["low", "normal", "high"]).default("normal"),
+						}),
+					},
+				},
+			},
+		},
 		responses: {
 			"200": {
-				description: "API is operational",
+				description: "All request parts echoed back",
 				content: {
 					"application/json": {
 						schema: z.object({
 							success: z.boolean(),
+							received: z.object({
+								exampleId: z.string(),
+								query: z.object({
+									q: z.string(),
+									limit: z.number().int(),
+									dryRun: z.boolean(),
+									channel: z.enum(["email", "sms", "push"]),
+								}),
+								body: z.object({
+									message: z.string(),
+									priority: z.enum(["low", "normal", "high"]),
+								}),
+							}),
+							preview: z.array(z.string()),
 							message: z.string(),
-							timestamp: z.string(),
 						}),
 					},
 				},
@@ -77,25 +134,76 @@ class TestEndpoint extends OpenAPIRoute {
 	};
 
 	async handle() {
+		const { params, query, body } =
+			await this.getValidatedData<typeof this.schema>();
 		return {
 			success: true,
-			message: "API is operational",
-			timestamp: new Date().toISOString(),
+			received: {
+				exampleId: params.exampleId,
+				query: {
+					q: query.q,
+					limit: query.limit,
+					dryRun: query.dryRun,
+					channel: query.channel,
+				},
+				body: {
+					message: body.message,
+					priority: body.priority,
+				},
+			},
+			preview: [
+				`${params.exampleId}:${query.q}:1`,
+				`${params.exampleId}:${query.q}:2`,
+				`${params.exampleId}:${query.q}:${query.limit}`,
+			],
+			message: `Prepared ${query.channel} workflow for ${params.exampleId}${query.dryRun ? " (dry run)" : ""}.`,
 		};
 	}
 }
 
-openapi.get("/test", TestEndpoint);
+openapi.post("/examples/:exampleId/workflow", ExampleWorkflowEndpoint);
 
 // Scalar-powered API reference UI at /api/v1/docs
 apiApp.get(
 	"/docs",
 	apiReference({
 		url: "/api/v1/openapi.json",
-		theme: "kepler",
-		pageTitle: "Bubbly Dragon API Reference",
+		pageTitle: `${PROJECT_NAME} API Reference`,
+		layout: "modern",
+		defaultOpenAllTags: true,
+		expandAllModelSections: true,
+		expandAllResponses: true,
+		hideModels: true,
+		hideClientButton: true,
+		showSidebar: true,
+		showDeveloperTools: "always",
+		operationTitleSource: "summary",
+		theme: "deepSpace",
+		persistAuth: true,
+		telemetry: true,
+		isEditable: false,
+		isLoading: false,
+		documentDownloadType: "none",
+		hideTestRequestButton: false,
+		hideSearch: true,
+		hideDarkModeToggle: false,
+		withDefaultFonts: true,
+		defaultOpenFirstTag: true,
+		orderSchemaPropertiesBy: "alpha",
+		orderRequiredPropertiesFirst: true,
+		_integration: "hono",
+		hideDownloadButton: true,
+		customCss:
+			'[aria-label="Developer Tools"] {display: none !important; } \n .scalar-mcp-layer { display: none !important;  } \n a[href="https://www.scalar.com"] { display: none !important; }\n .agent-button-container { display: none !important; }\n  ',
+		default: false,
 		authentication: {
-			preferredSecurityScheme: "bearerAuth",
+			preferredSecurityScheme: "httpBearer",
+			securitySchemes: {
+				httpBearer: {
+					scheme: "bearer",
+					token: "API key",
+				},
+			},
 		},
 	}),
 );
@@ -105,8 +213,7 @@ apiApp.get(
  * Useful for programmatic access without an HTTP round-trip.
  */
 function getOpenApiSpec(): Record<string, unknown> {
-	// biome-ignore lint/suspicious/noExplicitAny: getGeneratedSchema exists on the underlying OpenAPIRouter but isn't exposed on the proxy type
-	return (openapi as any).getGeneratedSchema() as Record<string, unknown>;
+	return openapi.schema as Record<string, unknown>;
 }
 
 export { apiApp, getOpenApiSpec };

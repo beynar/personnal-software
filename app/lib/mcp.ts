@@ -4,7 +4,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { apiApp } from "~/lib/api";
 import { getExecutor } from "~/lib/codemode";
-import { searchPublicCatalog } from "~/lib/openapi-catalog";
+import {
+	type CatalogEntry,
+	buildCatalog,
+	searchCatalog,
+	searchPublicCatalog,
+} from "~/lib/openapi-catalog";
 
 export const MCP_SERVER_INFO = {
 	name: "bubbly-dragon",
@@ -21,9 +26,24 @@ export type McpSession = {
 	scopes: string;
 };
 
+type RestAuthContext = {
+	headers: Record<string, string>;
+};
+
+type PathParamValue = string | number | boolean;
+type QueryParamValue =
+	| string
+	| number
+	| boolean
+	| null
+	| undefined
+	| Array<string | number | boolean | null | undefined>;
+
 interface ExecuteInput {
 	method?: string;
 	path?: string;
+	params?: Record<string, PathParamValue>;
+	query?: Record<string, QueryParamValue>;
 	headers?: Record<string, string>;
 	body?: unknown;
 }
@@ -43,6 +63,7 @@ interface ApiRouteNode {
 }
 
 const MAX_BODY_BYTES = 128 * 1024;
+const EXECUTABLE_ROUTE_CATALOG = buildExecutableRouteCatalog();
 
 const ALLOWED_HEADERS = new Set([
 	"content-type",
@@ -64,6 +85,15 @@ function requireSession(authInfo?: AuthInfo): McpSession {
 	return session as McpSession;
 }
 
+function requireRestAuth(authInfo?: AuthInfo): RestAuthContext {
+	const restAuth = authInfo?.extra?.restAuth;
+	if (!restAuth || typeof restAuth !== "object" || !("headers" in restAuth)) {
+		throw new Error("Missing REST auth context for MCP execution");
+	}
+
+	return restAuth as RestAuthContext;
+}
+
 function filterHeaders(responseHeaders: Headers): Record<string, string> {
 	const filtered: Record<string, string> = {};
 	for (const [key, value] of responseHeaders.entries()) {
@@ -74,41 +104,120 @@ function filterHeaders(responseHeaders: Headers): Record<string, string> {
 	return filtered;
 }
 
-function normalizePublicRoutePath(path?: string): string {
+function normalizeApiRoutePath(path?: string): string {
 	const value = path ?? "/";
 	const normalizedPath = value.startsWith("/api/v1")
 		? value
 		: `/api/v1${value.startsWith("/") ? "" : "/"}${value}`;
 
-	if (
-		normalizedPath !== "/api/v1/openapi.json" &&
-		normalizedPath !== "/api/v1/docs"
-	) {
-		throw new Error(
-			"Only public OpenAPI routes are allowed: /api/v1/openapi.json and /api/v1/docs",
-		);
-	}
-
 	return normalizedPath;
 }
 
-async function executePublicRoute(
-	input: ExecuteInput,
-): Promise<ResponseEnvelope> {
-	const method = (input.method ?? "GET").toUpperCase();
-	if (method !== "GET" && method !== "HEAD") {
-		throw new Error("Only GET and HEAD are allowed for public OpenAPI routes");
+function getExecutableRoute(
+	method: string,
+	path: string,
+): CatalogEntry | undefined {
+	return EXECUTABLE_ROUTE_CATALOG.find(
+		(entry) => entry.method === method && entry.path === path,
+	);
+}
+
+function buildForwardedHeaders(
+	authInfo?: AuthInfo,
+	inputHeaders?: Record<string, string>,
+): Headers {
+	const headers = new Headers(requireRestAuth(authInfo).headers);
+	for (const [key, value] of Object.entries(inputHeaders ?? {})) {
+		headers.set(key, value);
+	}
+	return headers;
+}
+
+function materializeRoutePath(
+	templatePath: string,
+	params: Record<string, PathParamValue> | undefined,
+): string {
+	const requiredParamNames = Array.from(
+		templatePath.matchAll(/\{([^}]+)\}/g),
+		(match) => match[1],
+	);
+
+	let resolvedPath = templatePath;
+	for (const paramName of requiredParamNames) {
+		const value = params?.[paramName];
+		if (value === undefined) {
+			throw new Error(`Missing required path param "${paramName}"`);
+		}
+		resolvedPath = resolvedPath.replace(
+			`{${paramName}}`,
+			encodeURIComponent(String(value)),
+		);
 	}
 
-	const path = input.path ?? "/";
-	const normalizedPath = normalizePublicRoutePath(path);
+	return resolvedPath;
+}
 
-	const headers = new Headers(input.headers ?? {});
-	const requestInit: RequestInit = {
-		method,
-		headers,
-	};
-	const request = new Request(`http://localhost${normalizedPath}`, requestInit);
+function appendQueryString(
+	path: string,
+	query: Record<string, QueryParamValue> | undefined,
+): string {
+	if (!query) return path;
+
+	const searchParams = new URLSearchParams();
+	for (const [key, value] of Object.entries(query)) {
+		appendQueryValue(searchParams, key, value);
+	}
+
+	const queryString = searchParams.toString();
+	return queryString ? `${path}?${queryString}` : path;
+}
+
+function appendQueryValue(
+	searchParams: URLSearchParams,
+	key: string,
+	value: QueryParamValue,
+): void {
+	if (value == null) return;
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			appendQueryValue(searchParams, key, item);
+		}
+		return;
+	}
+
+	searchParams.append(key, String(value));
+}
+
+async function executeApiRoute(
+	input: ExecuteInput,
+	authInfo?: AuthInfo,
+): Promise<ResponseEnvelope> {
+	const method = (input.method ?? "GET").toUpperCase();
+	const path = input.path ?? "/";
+	const normalizedTemplatePath = normalizeApiRoutePath(path);
+	const route = getExecutableRoute(method, normalizedTemplatePath);
+	if (!route) {
+		throw new Error(
+			`Route ${method} ${normalizedTemplatePath} is not available in the executable OpenAPI catalog`,
+		);
+	}
+	const resolvedPath = materializeRoutePath(route.path, input.params);
+	const requestPath = appendQueryString(resolvedPath, input.query);
+
+	const headers = buildForwardedHeaders(authInfo, input.headers);
+	let body: BodyInit | undefined;
+	if (input.body !== undefined && method !== "GET" && method !== "HEAD") {
+		if (!headers.has("content-type")) {
+			headers.set("content-type", "application/json");
+		}
+		const contentType = headers.get("content-type") ?? "";
+		body = contentType.includes("application/json")
+			? JSON.stringify(input.body)
+			: String(input.body);
+	}
+
+	const requestInit: RequestInit = { method, headers, body };
+	const request = new Request(`http://localhost${requestPath}`, requestInit);
 	const response = await apiApp.fetch(request);
 	const rawBody = await response.arrayBuffer();
 	const truncated = rawBody.byteLength > MAX_BODY_BYTES;
@@ -137,6 +246,15 @@ async function executePublicRoute(
 }
 
 function segmentToProperty(segment: string): string {
+	const parameterMatch = segment.match(/^\{(.+)\}$/);
+	if (parameterMatch) {
+		return segmentToSimpleProperty(parameterMatch[1] ?? "param");
+	}
+
+	return segmentToSimpleProperty(segment);
+}
+
+function segmentToSimpleProperty(segment: string): string {
 	const parts = segment
 		.replace(/[^a-zA-Z0-9]+/g, " ")
 		.trim()
@@ -147,12 +265,19 @@ function segmentToProperty(segment: string): string {
 	}
 
 	return parts
-		.map((part, index) => {
-			const lower = part.toLowerCase();
-			if (index === 0) return lower;
-			return lower.charAt(0).toUpperCase() + lower.slice(1);
-		})
+		.map((part, index) => normalizePropertyPart(part, index === 0))
 		.join("");
+}
+
+function normalizePropertyPart(part: string, isFirst: boolean): string {
+	const cleaned = part.replace(/[^a-zA-Z0-9]/g, "");
+	if (!cleaned) return "";
+
+	if (isFirst) {
+		return cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+	}
+
+	return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
 function buildApiRouteTree(): ApiRouteNode {
@@ -161,7 +286,7 @@ function buildApiRouteTree(): ApiRouteNode {
 		$methods: [],
 	};
 
-	for (const entry of searchPublicCatalog("")) {
+	for (const entry of EXECUTABLE_ROUTE_CATALOG) {
 		if (!entry.path.startsWith("/api/v1/")) continue;
 		const segments = entry.path
 			.replace(/^\/api\/v1\/?/, "")
@@ -220,7 +345,10 @@ function __createApiProxy(node, segments) {
 					return openapi.callRoute({
 						method: maybeMethod,
 						path,
+						params: input.params,
+						query: input.query,
 						headers: input.headers,
+						body: input.body,
 					});
 				};
 			}
@@ -239,7 +367,10 @@ const api = __createApiProxy(__apiTree, []);
 `;
 }
 
-async function executeSandboxedCode(code: string): Promise<{
+async function executeSandboxedCode(
+	code: string,
+	authInfo?: AuthInfo,
+): Promise<{
 	result: unknown;
 	logs: string[];
 }> {
@@ -247,13 +378,34 @@ async function executeSandboxedCode(code: string): Promise<{
 		name: "openapi",
 		tools: {
 			callRoute: {
+				inputSchema: z.object({
+					method: z.string().optional(),
+					path: z.string().optional(),
+					params: z
+						.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+						.optional(),
+					query: z
+						.record(
+							z.string(),
+							z.union([
+								z.string(),
+								z.number(),
+								z.boolean(),
+								z.null(),
+								z.array(
+									z.union([z.string(), z.number(), z.boolean(), z.null()]),
+								),
+							]),
+						)
+						.optional(),
+					headers: z.record(z.string(), z.string()).optional(),
+					body: z.unknown().optional(),
+				}),
 				description:
-					"Call a public OpenAPI route through the host. Input: { method?: string, path?: string, headers?: Record<string, string> }.",
+					"Call an OpenAPI route through the host. Input: { method?: string, path?: string, params?: Record<string, string | number | boolean>, query?: Record<string, string | number | boolean | null | Array<string | number | boolean | null>>, headers?: Record<string, string>, body?: unknown }.",
 				execute: async (input: unknown) => {
-					if (!input || typeof input !== "object") {
-						throw new Error("callRoute requires an object input");
-					}
-					return executePublicRoute(input as ExecuteInput);
+					requireSession(authInfo);
+					return executeApiRoute(input as ExecuteInput, authInfo);
 				},
 			},
 		},
@@ -295,29 +447,79 @@ export function createAuthInfo(session: McpSession): AuthInfo {
 	};
 }
 
+export function createRestAuthHeaders(
+	headers: Headers,
+): Record<string, string> {
+	const forwarded = new Headers();
+	const apiKey = headers.get("x-api-key");
+	if (apiKey) {
+		forwarded.set("authorization", `Bearer ${apiKey}`);
+		return Object.fromEntries(forwarded.entries());
+	}
+
+	const authorization = headers.get("authorization");
+	if (authorization) {
+		forwarded.set("authorization", authorization);
+	}
+
+	return Object.fromEntries(forwarded.entries());
+}
+
+function buildExecutableRouteCatalog(): CatalogEntry[] {
+	const entries = [...buildCatalog(), ...searchPublicCatalog("")];
+	const deduped = new Map<string, CatalogEntry>();
+	for (const entry of entries) {
+		deduped.set(`${entry.method}:${entry.path}`, entry);
+	}
+	return [...deduped.values()];
+}
+
 export function registerMcpTools(server: McpServer): void {
 	server.registerTool(
 		"search-routes",
 		{
 			title: "Search Routes",
 			description:
-				"Search the public OpenAPI route catalog by keyword. Returns matching routes with method, path, summary, and schema information.",
+				"Search the OpenAPI route catalog. Use this to find relevant API operations before executing requests.",
 			inputSchema: z.object({
 				query: z
 					.string()
 					.describe(
-						"Keyword to search for in route paths, summaries, descriptions, and tags.",
+						"Search text. You may provide a single query or a comma-separated list of queries. Search matches route methods, paths, summaries, descriptions, tags, parameters, and schema summaries.",
 					),
 			}),
 		},
-		async ({ query }) => ({
-			content: [
-				{
-					type: "text",
-					text: JSON.stringify(searchPublicCatalog(query), null, 2),
-				},
-			],
-		}),
+		async ({ query }) => {
+			const normalizedQueries = Array.from(
+				new Set(
+					query
+						.split(",")
+						.map((item) => item.trim())
+						.filter(Boolean),
+				),
+			);
+
+			const payload =
+				normalizedQueries.length === 1
+					? formatRouteSearchResults(searchCatalog(normalizedQueries[0] ?? ""))
+					: normalizedQueries
+							.map((item) =>
+								[
+									`query: ${item}`,
+									formatRouteSearchResults(searchCatalog(item)),
+								].join("\n"),
+							)
+							.join("\n\n---\n\n");
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: payload,
+					},
+				],
+			};
+		},
 	);
 
 	server.registerTool(
@@ -325,7 +527,7 @@ export function registerMcpTools(server: McpServer): void {
 		{
 			title: "Execute Code",
 			description:
-				"Execute JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox exposes an api.* recursive proxy over the public OpenAPI routes. Example: api.openapiJson.get() or api.docs.get(). Only the public routes /api/v1/openapi.json and /api/v1/docs can be called.",
+				'Execute JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox exposes an `api.*` proxy derived from executable OpenAPI routes. Use `search-routes` first to discover available routes and their input/output types, then call them with route-shaped code such as `await api.examples.exampleId.workflow.post({ params: { exampleId: "sample" }, query: { q: "widget", limit: 5, dryRun: true, channel: "email" }, body: { message: "hello", priority: "high" } })`. Parameterized path segments become plain parameter-name properties in the proxy. Route method calls accept an object with optional `params`, `query`, `headers`, and `body`. The submitted code must be an async arrow function.',
 			inputSchema: z.object({
 				code: z
 					.string()
@@ -334,7 +536,7 @@ export function registerMcpTools(server: McpServer): void {
 		},
 		async ({ code }, extra) => {
 			requireSession(extra.authInfo);
-			const execution = await executeSandboxedCode(code);
+			const execution = await executeSandboxedCode(code, extra.authInfo);
 			return {
 				content: [
 					{
@@ -345,4 +547,26 @@ export function registerMcpTools(server: McpServer): void {
 			};
 		},
 	);
+}
+
+function formatRouteSearchResults(entries: CatalogEntry[]): string {
+	if (entries.length === 0) {
+		return "No matching routes found.";
+	}
+
+	return entries.map(formatRouteEntry).join("\n\n---\n\n");
+}
+
+function formatRouteEntry(entry: CatalogEntry): string {
+	const description = entry.description || entry.summary || "No description.";
+	return [
+		`${entry.method} ${entry.path}`,
+		description,
+		"",
+		"input:",
+		entry.inputType,
+		"",
+		"output:",
+		entry.outputType,
+	].join("\n");
 }
