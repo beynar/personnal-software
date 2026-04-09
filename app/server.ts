@@ -40,7 +40,7 @@ function handleOAuthAuthorizationServer(): Response {
 		grant_types_supported: ["authorization_code"],
 		token_endpoint_auth_methods_supported: ["client_secret_post"],
 		code_challenge_methods_supported: ["S256"],
-		scopes_supported: ["mcp:tools"],
+		scopes_supported: ["openid", "profile", "email", "offline_access"],
 	});
 }
 
@@ -54,7 +54,6 @@ function handleOAuthProtectedResource(origin: string): Response {
 		resource: `${origin}/api/mcp`,
 		authorization_servers: [`${convexSiteUrl}/api/auth`],
 		bearer_methods_supported: ["header"],
-		scopes_supported: ["mcp:tools"],
 	});
 }
 

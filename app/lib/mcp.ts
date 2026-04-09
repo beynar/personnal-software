@@ -11,22 +11,14 @@ export const MCP_SERVER_INFO = {
 	version: "1.0.0",
 } as const;
 
-type McpUser = {
-	id: string;
-	email: string;
-	name: string;
-	createdAt: string;
-};
-
 export type McpSession = {
-	user: McpUser;
-	session: {
-		id: string;
-		expiresAt: string;
-	};
-	credential:
-		| { type: "bearer"; token: string }
-		| { type: "api-key"; apiKey: string };
+	accessToken: string;
+	refreshToken: string;
+	accessTokenExpiresAt: Date | string;
+	refreshTokenExpiresAt: Date | string;
+	clientId: string;
+	userId: string;
+	scopes: string;
 };
 
 interface ExecuteInput {
@@ -290,16 +282,13 @@ ${buildApiProxyPrelude()}
 }
 
 export function createAuthInfo(session: McpSession): AuthInfo {
-	const token =
-		session.credential.type === "bearer"
-			? session.credential.token
-			: session.credential.apiKey;
-
 	return {
-		token,
-		clientId: `user:${session.user.id}`,
-		scopes: ["mcp:tools"],
-		expiresAt: Math.floor(new Date(session.session.expiresAt).getTime() / 1000),
+		token: session.accessToken,
+		clientId: session.clientId,
+		scopes: [],
+		expiresAt: Math.floor(
+			new Date(session.accessTokenExpiresAt).getTime() / 1000,
+		),
 		extra: {
 			session,
 		},

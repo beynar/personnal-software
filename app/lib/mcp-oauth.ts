@@ -58,7 +58,6 @@ export function handleOAuthProtectedResource(origin: string): Response {
 		resource: `${origin}/api/mcp`,
 		authorization_servers: [`${origin}/api/auth`],
 		bearer_methods_supported: ["header"],
-		scopes_supported: ["mcp:tools"],
 	});
 }
 
