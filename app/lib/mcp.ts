@@ -10,9 +10,10 @@ import {
 	searchCatalog,
 	searchPublicCatalog,
 } from "~/lib/openapi-catalog";
+import { PROJECT_NAME } from "~/lib/project";
 
 export const MCP_SERVER_INFO = {
-	name: "personnal-software",
+	name: PROJECT_NAME,
 	version: "1.0.0",
 } as const;
 

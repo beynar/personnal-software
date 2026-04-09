@@ -1,4 +1,4 @@
-const DEFAULT_PROJECT_NAME = "Bubbly Dragon";
+const DEFAULT_PROJECT_NAME = "Personnal Software";
 
 export const PROJECT_NAME = getProjectName();
 export const PROJECT_INITIALS = getProjectInitials(PROJECT_NAME);
@@ -18,7 +18,7 @@ function getProjectInitials(value: string) {
 	const parts = value.split(/\s+/).filter(Boolean).slice(0, 2);
 
 	if (!parts.length) {
-		return "BD";
+		return "PS";
 	}
 
 	return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
