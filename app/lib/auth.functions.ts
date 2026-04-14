@@ -12,7 +12,8 @@ export const checkBetterAuthSession = createServerFn({
 	try {
 		const token = await getToken();
 		return !!token;
-	} catch {
+	} catch (err) {
+		console.error("[checkBetterAuthSession] caught error:", err);
 		return false;
 	}
 });

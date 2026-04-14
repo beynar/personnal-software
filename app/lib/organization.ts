@@ -27,7 +27,17 @@ export async function ensureOrganizationForSession(
 		return activeOrganization.id;
 	}
 
-	const organizations = options?.organizations ?? null;
+	let organizations = options?.organizations ?? null;
+
+	// When called without pre-fetched org data (e.g. right after sign-in),
+	// query the server so we don't blindly create a duplicate org.
+	if (!organizations) {
+		const listResult = await client.organization.list();
+		organizations =
+			(Array.isArray(listResult?.data) ? listResult.data : null) ??
+			(Array.isArray(listResult) ? listResult : null);
+	}
+
 	if (organizations?.length) {
 		const firstOrganizationId = organizations[0]?.id;
 		if (!firstOrganizationId) {

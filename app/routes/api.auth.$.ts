@@ -5,7 +5,7 @@ import {
 	handleOAuthOptions,
 } from "~/lib/mcp-oauth";
 
-function handleAuthRequest(request: Request): Promise<Response> | Response {
+async function handleAuthRequest(request: Request): Promise<Response> {
 	const url = new URL(request.url);
 	if (url.pathname === "/api/auth/.well-known/oauth-authorization-server") {
 		if (request.method === "OPTIONS") {

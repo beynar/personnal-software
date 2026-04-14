@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import {
 	Card,
@@ -46,12 +47,10 @@ export function PublicAuthCard({
 
 function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 	const navigate = useNavigate();
-	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
 	async function handleSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault();
-		setError("");
 		setLoading(true);
 		const formData = new FormData(e.currentTarget);
 		const email = formData.get("email") as string;
@@ -62,7 +61,7 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				password,
 			});
 			if (authError) {
-				setError(authError.message ?? "Failed to sign in");
+				toast.error(authError.message ?? "Failed to sign in");
 				return;
 			}
 			await ensureOrganizationForSession(authClient, { email });
@@ -72,7 +71,9 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				navigate({ to: "/dashboard" });
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to sign in");
+			toast.error(
+				err instanceof Error ? err.message : "Failed to sign in",
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -101,7 +102,6 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 					required
 				/>
 			</div>
-			{error && <p className="text-sm text-destructive">{error}</p>}
 			<Button type="submit" className="w-full" disabled={loading}>
 				{loading ? "Signing in…" : "Sign In"}
 			</Button>
@@ -111,12 +111,10 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 
 function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 	const navigate = useNavigate();
-	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
 	async function handleSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault();
-		setError("");
 		const formData = new FormData(e.currentTarget);
 		const email = formData.get("email") as string;
 		const password = formData.get("password") as string;
@@ -125,7 +123,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 		const superAdminPassword = formData.get("superAdminPassword") as string;
 
 		if (password !== confirmPassword) {
-			setError("Passwords do not match");
+			toast.error("Passwords do not match");
 			return;
 		}
 
@@ -140,7 +138,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				},
 			);
 			if (authError) {
-				setError(authError.message ?? "Failed to create account");
+				toast.error(authError.message ?? "Failed to create account");
 				return;
 			}
 			await ensureOrganizationForSession(authClient, { email, name });
@@ -150,7 +148,9 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				navigate({ to: "/dashboard" });
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to create account");
+			toast.error(
+				err instanceof Error ? err.message : "Failed to create account",
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -212,7 +212,6 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 					required
 				/>
 			</div>
-			{error && <p className="text-sm text-destructive">{error}</p>}
 			<Button type="submit" className="w-full" disabled={loading}>
 				{loading ? "Creating account…" : "Sign Up"}
 			</Button>
