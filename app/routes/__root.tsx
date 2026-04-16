@@ -85,7 +85,7 @@ function RootDocument({ children }: { children: ReactNode }) {
 				<TooltipProvider>
 					{children}
 					<Toaster richColors />
-					<TanStackRouterDevtools />
+					<TanStackRouterDevtools position="bottom-right" />
 					<Scripts />
 				</TooltipProvider>
 			</body>

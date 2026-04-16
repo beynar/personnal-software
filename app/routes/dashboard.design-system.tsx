@@ -386,6 +386,7 @@ export const Route = createFileRoute("/dashboard/design-system")({
 			title: "Design System",
 		},
 	},
+	ssr: false,
 	component: DesignSystemPage,
 });
 

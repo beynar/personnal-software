@@ -71,9 +71,7 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				navigate({ to: "/dashboard" });
 			}
 		} catch (err) {
-			toast.error(
-				err instanceof Error ? err.message : "Failed to sign in",
-			);
+			toast.error(err instanceof Error ? err.message : "Failed to sign in");
 		} finally {
 			setLoading(false);
 		}
