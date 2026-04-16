@@ -83,7 +83,13 @@ export function OrganizationSwitcher({
 							<div
 								className={`flex min-w-0 items-center ${isCollapsed ? "w-full justify-center gap-0" : "gap-3"}`}
 							>
-								<Avatar className="size-6.5 border border-sidebar-border/70 bg-sidebar-accent">
+								<Avatar
+									className={cn(
+										"border border-sidebar-border/70 bg-sidebar-accent",
+										isCollapsed ? "size-10" : "size-6.5",
+									)}
+									size={isCollapsed ? "lg" : "default"}
+								>
 									<AvatarImage
 										alt={currentOrganization?.name ?? "Organization"}
 										src={currentOrganization?.logo ?? undefined}
@@ -247,7 +253,12 @@ function OrganizationSwitcherSkeleton({
 						isCollapsed ? "w-full justify-center gap-0" : "gap-3",
 					)}
 				>
-					<Skeleton className="size-7 shrink-0 rounded-full" />
+					<Skeleton
+						className={cn(
+							"shrink-0 rounded-full",
+							isCollapsed ? "size-10" : "size-7",
+						)}
+					/>
 					{isCollapsed ? null : <Skeleton className="h-4 w-28 rounded-md" />}
 				</div>
 				{isCollapsed ? null : (
