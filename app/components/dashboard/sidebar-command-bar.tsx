@@ -75,7 +75,7 @@ export function DashboardSidebarCommandBar({
 		return (
 			<>
 				<Button
-					className="m-0 h-16 w-full rounded-none border-b border-border/70"
+					className="m-0 h-14 w-full rounded-none border-b border-border/70"
 					onClick={() => setOpen(true)}
 					size="icon"
 					type="button"
@@ -100,7 +100,7 @@ export function DashboardSidebarCommandBar({
 	return (
 		<>
 			<Button
-				className="h-10 w-full justify-between rounded-xl border-border/70 px-3 text-muted-foreground"
+				className="h-9 w-full justify-between rounded-xl border-border/70 px-2.5 text-muted-foreground"
 				onClick={() => setOpen(true)}
 				type="button"
 				variant="outline"
@@ -109,7 +109,7 @@ export function DashboardSidebarCommandBar({
 					<Command className="size-4" />
 					<span className="text-sm">Search commands</span>
 				</span>
-				<CommandShortcut className="ml-3 inline-flex">⌘K</CommandShortcut>
+				<CommandShortcut className="ml-2.5 inline-flex">⌘K</CommandShortcut>
 			</Button>
 			<DashboardCommandDialog
 				activeOrganization={activeOrganization}

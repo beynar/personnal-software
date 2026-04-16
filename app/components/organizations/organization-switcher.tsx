@@ -72,18 +72,18 @@ export function OrganizationSwitcher({
 	return (
 		<>
 			<Popover onOpenChange={setOpen} open={open}>
-				<PopoverTrigger asChild className="p-1! flex justify-center gap-0!">
+				<PopoverTrigger asChild>
 					{loadingActiveOrganization || loadingOrganizations ? (
 						<OrganizationSwitcherSkeleton isCollapsed={isCollapsed} />
 					) : (
 						<Button
-							className="h-10 w-full justify-between rounded-lg border border-border/60 bg-sidebar-accent/50 px-2 text-left text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent/70"
+							className="h-full w-full justify-between rounded-none border-0 bg-transparent px-2 text-left text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent/70"
 							variant="ghost"
 						>
 							<div
 								className={`flex min-w-0 items-center ${isCollapsed ? "w-full justify-center gap-0" : "gap-3"}`}
 							>
-								<Avatar className="size-7 border border-sidebar-border/70 bg-sidebar-accent">
+								<Avatar className="size-6.5 border border-sidebar-border/70 bg-sidebar-accent">
 									<AvatarImage
 										alt={currentOrganization?.name ?? "Organization"}
 										src={currentOrganization?.logo ?? undefined}
@@ -106,7 +106,9 @@ export function OrganizationSwitcher({
 				</PopoverTrigger>
 				<PopoverContent
 					align="start"
+					alignOffset={4}
 					className="w-[16.5rem] rounded-md border-border/60 p-0 shadow-lg"
+					collisionPadding={12}
 					side="right"
 					sideOffset={12}
 				>
@@ -237,7 +239,7 @@ function OrganizationSwitcherSkeleton({
 	isCollapsed: boolean;
 }) {
 	return (
-		<div className="h-10 w-full rounded-lg border border-border/60 bg-sidebar-accent/50 px-2">
+		<div className="h-full w-full px-2.5">
 			<div className="flex h-full items-center justify-between gap-3">
 				<div
 					className={cn(

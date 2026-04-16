@@ -12,7 +12,6 @@ import {
 	ArrowLeft,
 	BookOpen,
 	Building2,
-	ChevronsUpDown,
 	Copy,
 	Home,
 	Key,
@@ -162,7 +161,7 @@ function DashboardShell() {
 	return (
 		<SidebarProvider className="min-h-screen">
 			<Sidebar>
-				<SidebarHeader className="h-18 px-3 py-2.5">
+				<SidebarHeader className="h-14 p-0">
 					<DashboardSidebarOrganizationSwitcher />
 				</SidebarHeader>
 				<SidebarContent>
@@ -191,7 +190,7 @@ function DashboardShell() {
 				/>
 			</Sidebar>
 			<SidebarInset>
-				<header className="sticky top-0 z-10 h-18 border-b border-border/70 bg-background/95 backdrop-blur">
+				<header className="sticky top-0 z-10 h-14 border-b border-border/70 bg-background/95 backdrop-blur">
 					<div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6">
 						<div className="flex items-center gap-3">
 							<SidebarTrigger />
@@ -274,11 +273,11 @@ function SessionFooter({
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
-							className="h-11 w-full justify-between rounded-xl px-2.5"
+							className="h-auto w-full justify-start rounded-xl px-1 py-1.5"
 							variant="ghost"
 						>
-							<div className="flex min-w-0 items-center gap-3 text-left">
-								<Avatar className="size-8 border border-border/70" size="lg">
+							<div className="flex min-w-0 items-center gap-2 text-left">
+								<Avatar className="size-7 border border-border/70" size="lg">
 									<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
 									<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
 								</Avatar>
@@ -289,7 +288,6 @@ function SessionFooter({
 									</p>
 								</div>
 							</div>
-							<ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -374,10 +372,10 @@ function AccountMenuItems({
 function SessionFooterSkeleton({ className }: { className?: string }) {
 	return (
 		<div className={cn("min-w-0 flex-1 rounded-xl", className)}>
-			<div className="h-11 w-full px-2.5">
+			<div className="h-10 w-full px-2">
 				<div className="flex h-full items-center justify-between gap-3">
-					<div className="flex min-w-0 items-center gap-3">
-						<Skeleton className="size-8 shrink-0 rounded-full" />
+					<div className="flex min-w-0 items-center gap-2.5">
+						<Skeleton className="size-7 shrink-0 rounded-full" />
 						<div className="min-w-0 flex-1 space-y-1.5">
 							<Skeleton className="h-3.5 w-24 rounded-md" />
 							<Skeleton className="h-3 w-32 rounded-md" />
@@ -392,8 +390,8 @@ function SessionFooterSkeleton({ className }: { className?: string }) {
 
 function CollapsedSessionFooterSkeleton() {
 	return (
-		<div className="flex h-16 w-full items-center justify-center rounded-none border-0">
-			<Skeleton className="size-9 rounded-full" />
+		<div className="flex h-14 w-full items-center justify-center rounded-none border-0">
+			<Skeleton className="size-8 rounded-full" />
 		</div>
 	);
 }
@@ -436,7 +434,7 @@ function DashboardSidebarFooter({
 						theme={theme}
 					/>
 					<ThemeToggle
-						className="m-0 h-16 w-full rounded-none border-b border-border/70"
+						className="m-0 h-14 w-full rounded-none border-b border-border/70"
 						onThemeChange={onThemeChange}
 						size="icon"
 						theme={theme}
@@ -466,7 +464,7 @@ function DashboardSidebarFooter({
 					showTrigger={false}
 				/>
 				<ThemeToggle
-					className="m-0 h-16 w-full rounded-none border-b border-border/70"
+					className="m-0 h-14 w-full rounded-none border-b border-border/70"
 					onThemeChange={onThemeChange}
 					size="icon"
 					theme={theme}
@@ -475,11 +473,11 @@ function DashboardSidebarFooter({
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
-							className="m-0 h-16 w-full rounded-none border-0"
+							className="m-0 h-14 w-full rounded-none border-0"
 							size="icon"
 							variant="ghost"
 						>
-							<Avatar className="size-9 border border-border/70" size="lg">
+							<Avatar className="size-8 border border-border/70" size="lg">
 								<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
 								<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
 							</Avatar>
@@ -556,7 +554,7 @@ function ThemeToggle({
 	if (compact) {
 		return (
 			<Button
-				className={cn("size-11 rounded-xl", className)}
+				className={cn("size-10 rounded-xl", className)}
 				onClick={toggleTheme}
 				size="icon"
 				type="button"
@@ -572,12 +570,12 @@ function ThemeToggle({
 		return (
 			<div
 				className={cn(
-					"flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2",
+					"flex items-center justify-between gap-2.5 rounded-xl border border-border/70 bg-background/60 px-2.5 py-1.5",
 					className,
 				)}
 			>
 				<div className="flex min-w-0 items-center gap-3">
-					<div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+					<div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
 						<Icon className="size-4" />
 					</div>
 					<div className="min-w-0" id="theme-toggle-label">

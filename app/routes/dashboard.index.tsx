@@ -50,6 +50,11 @@ export const Route = createFileRoute("/dashboard/")({
 		},
 	},
 	loader: async ({ context }) => {
+		// Reference SSR path for new features:
+		// route loader -> context.getOrpc() -> oRPC capability -> backend logic.
+		// Do not self-fetch /api/v1/* from loaders when the request is already on
+		// the server. Add client-side Convex hooks separately only if the page
+		// needs live updates after first paint.
 		const orpc = context.getOrpc();
 
 		return orpc.examples.workflow({

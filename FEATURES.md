@@ -55,6 +55,17 @@ Use TanStack route loaders for page-initial server data.
 - Prefer Convex `useQuery` only when the UI needs live reactive updates after render.
 - Do not duplicate backend logic inside a loader.
 - Do not put auth authorization logic only in a loader. Server-side ownership rules still belong behind the oRPC layer and in Convex functions.
+- Do not self-fetch `/api/v1/*` from a loader. Use `context.getOrpc()` so SSR stays in-process.
+
+## Decision tree
+
+Use this rule set before adding code:
+
+- user or agent capability: define it in the oRPC contract/router layer
+- initial page render data: call that capability from the route loader via `context.getOrpc()`
+- live reactive UI after first paint: use Convex hooks in the client
+- local presentation state: keep it in React state
+- small server-only helper that is not a product capability: use `createServerFn`
 
 ## Machine contract
 
@@ -63,6 +74,24 @@ Use TanStack route loaders for page-initial server data.
 - MCP route discovery and execution are driven by the generated OpenAPI spec.
 - Do not add hand-written REST handlers for product capabilities in route files.
 - If a capability should be available to an LLM or external client, it belongs in oRPC, not only in the page loader.
+
+## Golden path reference
+
+Use the existing starter flow as the reference implementation instead of inventing a new shape:
+
+- capability contract: `app/lib/orpc/contract.ts`
+- capability implementation: `app/lib/orpc/router.ts`
+- generated public API surface: `app/lib/api.ts`
+- route loader using the default oRPC client: `app/routes/dashboard.index.tsx`
+- optional reactive client follow-up: dashboard shell and profile routes that use Convex hooks
+
+That route is intentionally documented as the canonical SSR path:
+
+1. define or extend a capability in oRPC
+2. keep backend rules in Convex
+3. call the capability from the page loader with `context.getOrpc()`
+4. render the first payload from loader data
+5. add client-side Convex hooks only if the screen truly needs live updates
 
 ## Queries, mutations, and actions
 
@@ -105,6 +134,22 @@ Convex authorization patterns:
 
 If a feature is user-owned, every write path must verify ownership in Convex before mutating data.
 
+## `createServerFn`
+
+`createServerFn` is for narrow app-internal server helpers, not the canonical product API surface.
+
+Good fits:
+
+- auth/session glue
+- request-scoped helpers
+- small server-only transforms or guards
+
+Bad fits:
+
+- user-facing product capabilities
+- machine-readable API surface
+- feature mutations that should also be available to MCP or external clients
+
 ## UI decomposition
 
 Place reusable presentational components under:
@@ -143,3 +188,10 @@ If the feature changes auth, also verify:
 2. authenticated access
 3. redirect behavior
 4. ownership enforcement in Convex
+
+## Anti-patterns
+
+- no self-fetching the app's own `/api/v1/*` routes from SSR loaders
+- no business logic or ownership checks in route files
+- no second machine contract outside `app/lib/orpc/`
+- no defaulting to `createServerFn` when the feature is a real user or agent capability
