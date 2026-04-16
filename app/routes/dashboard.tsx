@@ -273,17 +273,19 @@ function SessionFooter({
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
-							className="h-auto w-full justify-start rounded-xl px-1 py-1.5"
+							className="h-10 w-full justify-start rounded-xl px-3"
 							variant="ghost"
 						>
 							<div className="flex min-w-0 items-center gap-2 text-left">
-								<Avatar className="size-7 border border-border/70" size="lg">
+								<Avatar className="size-6.5 border border-border/70">
 									<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
 									<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
 								</Avatar>
-								<div className="min-w-0">
-									<p className="truncate text-sm font-medium">{userLabel}</p>
-									<p className="truncate text-xs text-muted-foreground">
+								<div className="min-w-0 space-y-0.5">
+									<p className="truncate text-xs font-medium leading-tight">
+										{userLabel}
+									</p>
+									<p className="truncate text-[11px] leading-tight text-muted-foreground">
 										{user?.email ?? "Account"}
 									</p>
 								</div>
@@ -372,16 +374,13 @@ function AccountMenuItems({
 function SessionFooterSkeleton({ className }: { className?: string }) {
 	return (
 		<div className={cn("min-w-0 flex-1 rounded-xl", className)}>
-			<div className="h-10 w-full px-2">
-				<div className="flex h-full items-center justify-between gap-3">
-					<div className="flex min-w-0 items-center gap-2.5">
-						<Skeleton className="size-7 shrink-0 rounded-full" />
-						<div className="min-w-0 flex-1 space-y-1.5">
-							<Skeleton className="h-3.5 w-24 rounded-md" />
-							<Skeleton className="h-3 w-32 rounded-md" />
-						</div>
+			<div className="h-10 w-full px-3">
+				<div className="flex h-full min-w-0 items-center gap-2">
+					<Skeleton className="size-6.5 shrink-0 rounded-full" />
+					<div className="min-w-0 flex-1 space-y-1">
+						<Skeleton className="h-3 w-20 rounded-md" />
+						<Skeleton className="h-2.5 w-28 rounded-md" />
 					</div>
-					<Skeleton className="size-4 shrink-0 rounded-sm" />
 				</div>
 			</div>
 		</div>
