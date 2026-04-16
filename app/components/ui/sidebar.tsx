@@ -16,8 +16,8 @@ type SidebarContextValue = {
 	toggleSidebar: () => void;
 };
 
-const SIDEBAR_WIDTH = "17rem";
-const SIDEBAR_ICON_WIDTH = "4.5rem";
+const SIDEBAR_WIDTH = "15.5rem";
+const SIDEBAR_ICON_WIDTH = "4rem";
 const SidebarContext = React.createContext<SidebarContextValue | null>(null);
 
 function useSidebar() {
@@ -122,7 +122,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			className={cn(
-				"flex flex-col gap-3 border-b border-border/70 p-3 transition-[padding] duration-200 ease-in-out",
+				"flex flex-col justify-center gap-2 border-b border-border/70 p-2.5 transition-[padding] duration-200 ease-in-out",
 				className,
 			)}
 			{...props}
@@ -134,7 +134,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			className={cn(
-				"flex flex-1 flex-col gap-4 p-3 transition-[padding] duration-200 ease-in-out",
+				"flex flex-1 flex-col gap-3 p-2.5 transition-[padding] duration-200 ease-in-out",
 				className,
 			)}
 			{...props}
@@ -146,7 +146,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			className={cn(
-				"border-t border-border/70 p-3 transition-[padding] duration-200 ease-in-out",
+				"border-t border-border/70 p-2.5 transition-[padding] duration-200 ease-in-out",
 				className,
 			)}
 			{...props}
@@ -202,7 +202,7 @@ function SidebarMenuButton({
 	return (
 		<Comp
 			className={cn(
-				"flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-hidden focus:ring-2 focus:ring-ring",
+				"flex h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-hidden focus:ring-2 focus:ring-ring",
 				isActive && "bg-accent text-accent-foreground shadow-sm",
 				isCollapsed && !isMobile && "justify-center px-0",
 				className,

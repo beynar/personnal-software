@@ -4,6 +4,7 @@ import {
 	createStartHandler,
 	defaultStreamHandler,
 } from "@tanstack/react-start/server";
+import { createServerApiClient } from "~/lib/orpc/client.server";
 
 const startFetch = createStartHandler(defaultStreamHandler);
 
@@ -61,8 +62,7 @@ export type ServerEntry = { fetch: RequestHandler<Register> };
 
 function createServerEntry(entry: ServerEntry): ServerEntry {
 	return {
-		async fetch(...args) {
-			const request = args[0];
+		async fetch(request) {
 			const url = new URL(request.url);
 
 			// Handle .well-known discovery endpoints before TanStack Start routing
@@ -79,7 +79,11 @@ function createServerEntry(entry: ServerEntry): ServerEntry {
 				return handleOAuthProtectedResource(url.origin);
 			}
 
-			return await entry.fetch(...args);
+			return await entry.fetch(request, {
+				context: {
+					orpc: createServerApiClient(request),
+				},
+			});
 		},
 	};
 }

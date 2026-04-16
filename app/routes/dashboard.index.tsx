@@ -43,10 +43,35 @@ const overviewCards = [
 ] as const;
 
 export const Route = createFileRoute("/dashboard/")({
+	staticData: {
+		dashboardHeader: {
+			description: "Starter workspace with a persistent shell and nested pages",
+			title: "Overview",
+		},
+	},
+	loader: async ({ context }) => {
+		const orpc = context.getOrpc();
+
+		return orpc.examples.workflow({
+			params: { exampleId: "starter" },
+			query: {
+				q: "dashboard",
+				limit: 3,
+				dryRun: true,
+				channel: "email",
+			},
+			body: {
+				message: "Dashboard shell boot preview",
+				priority: "normal",
+			},
+		});
+	},
 	component: DashboardOverviewPage,
 });
 
 function DashboardOverviewPage() {
+	const workflowPreview = Route.useLoaderData();
+
 	return (
 		<div className="space-y-6">
 			<Card className="overflow-hidden border-border/70">
@@ -133,6 +158,15 @@ function DashboardOverviewPage() {
 							<p className="mt-1 text-sm text-muted-foreground">
 								The dashboard now ships with overview, profile, and design
 								system child pages under one persistent shell.
+							</p>
+						</div>
+						<div className="rounded-xl bg-muted/60 p-4">
+							<p className="font-medium">oRPC loader preview</p>
+							<p className="mt-1 text-sm text-muted-foreground">
+								{workflowPreview.message}
+							</p>
+							<p className="mt-2 text-xs text-muted-foreground">
+								{workflowPreview.preview.join(" • ")}
 							</p>
 						</div>
 						<div className="flex items-center gap-2 text-sm font-medium text-foreground">

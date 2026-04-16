@@ -180,6 +180,8 @@ After creating an account, verify REST and MCP auth:
    # expect JSON-RPC response with tool list
    ```
 
+The app itself now uses the same capability layer through a typed oRPC client. SSR loaders should call the default router-context client instead of making HTTP calls back into `/api/v1/*`.
+
 The `execute` MCP tool runs JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox does not receive raw credentials directly; it gets a host-exposed `api.*` proxy over executable OpenAPI routes with auth forwarded by the host.
 
 Proxy conventions:

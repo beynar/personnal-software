@@ -7,6 +7,7 @@ If you are adding a new feature, do not improvise the structure. Follow these pl
 ## Core rule
 
 - Put UI concerns in `app/`.
+- Put the canonical machine contract in the oRPC layer under `app/lib/orpc/`.
 - Put persistent data and business logic in `convex/`.
 - Keep route files thin. A route should compose UI and call existing APIs, not become the API.
 
@@ -33,7 +34,8 @@ Use route files for:
 - `createFileRoute(...)`
 - page-level layout
 - route-local UI state
-- calling Convex hooks from the client
+- calling the default oRPC client from loaders
+- calling Convex hooks from the client when reactivity is required
 - redirecting between public and authenticated areas
 
 Do not use route files for:
@@ -47,12 +49,20 @@ Those belong in `convex/`.
 
 ## Loaders
 
-Use TanStack route loaders sparingly.
+Use TanStack route loaders for page-initial server data.
 
-- Prefer Convex `useQuery` for reactive authenticated app data.
-- Use a loader only for route-level data that must exist before render and does not benefit from Convex reactivity.
-- Do not duplicate Convex query logic inside a loader.
-- Do not put auth authorization logic only in a loader. Server-side ownership rules still belong in Convex functions.
+- Prefer the default oRPC client from router context for loader data.
+- Prefer Convex `useQuery` only when the UI needs live reactive updates after render.
+- Do not duplicate backend logic inside a loader.
+- Do not put auth authorization logic only in a loader. Server-side ownership rules still belong behind the oRPC layer and in Convex functions.
+
+## Machine contract
+
+- Define user and agent capabilities in the oRPC contract/router layer first.
+- `/api/v1/*` is generated from that layer and is the public OpenAPI surface.
+- MCP route discovery and execution are driven by the generated OpenAPI spec.
+- Do not add hand-written REST handlers for product capabilities in route files.
+- If a capability should be available to an LLM or external client, it belongs in oRPC, not only in the page loader.
 
 ## Queries, mutations, and actions
 

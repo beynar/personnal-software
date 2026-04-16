@@ -1,5 +1,5 @@
 import { handler } from "~/lib/auth-server";
-import type { McpSession } from "~/lib/mcp";
+import type { McpSession } from "~/lib/rest-auth";
 
 const AUTH_BASE_URL = "http://local/api/auth";
 
@@ -16,6 +16,10 @@ export const auth = {
 					headers,
 				}),
 			);
+
+			if (response.status === 401 || response.status === 404) {
+				return null;
+			}
 
 			if (!response.ok) {
 				throw new Error(

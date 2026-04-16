@@ -12,6 +12,7 @@ For a fresh clone, follow [BOOTSTRAP.md](./BOOTSTRAP.md) before doing anything e
 |-------|-----------|
 | Framework | TanStack Start v1.167 (Vite-native, React 19) |
 | Routing | TanStack Router (file-based, flat routes) |
+| Machine API | oRPC + OpenAPI |
 | Backend | Convex (real-time database, auth, file storage) |
 | Auth | `@convex-dev/better-auth` (Better Auth local component) |
 | Styling | Tailwind CSS v4, shadcn/ui components |
@@ -89,6 +90,7 @@ npm run deploy
 │   ├── components/
 │   │   └── ui/                 # shadcn/ui components (Button, Card, Input, etc.)
 │   ├── lib/
+│   │   ├── orpc/               # Canonical oRPC contract, router, and clients
 │   │   └── utils.ts            # cn() helper (clsx + tailwind-merge)
 │   └── worker/                 # Cloudflare Worker modules
 │       ├── scheduled.ts        # Cron Trigger handler
@@ -115,7 +117,8 @@ This starter is organized around a few clear boundaries:
 - `app/routes/*` handles page routing, page composition, redirects, and HTTP entrypoints
 - `app/components/*` handles feature UI, while `app/components/ui/*` is reserved for reusable primitives
 - `convex/*` holds persistent data, business logic, ownership checks, and application APIs
-- `app/lib/api.ts` exposes the REST/OpenAPI surface for machine-readable HTTP access
+- `app/lib/orpc/*` defines the canonical machine contract and its implementations
+- `app/lib/api.ts` mounts the oRPC OpenAPI surface for machine-readable HTTP access
 - `app/lib/mcp.ts` keeps the MCP layer thin by deriving route discovery and execution from the OpenAPI catalog instead of hand-writing one MCP tool per route
 - Better Auth provides the auth boundary across browser sessions, API keys, REST access, and MCP access
 
@@ -123,10 +126,10 @@ In practice, that means:
 
 - add user-facing pages in `app/routes/`
 - add durable product logic in `convex/`
-- expose machine-facing routes through the OpenAPI-backed API layer
+- define machine-facing capabilities in oRPC first, then expose them through the generated OpenAPI layer
 - let MCP discover and execute those capabilities through the OpenAPI-driven bridge
 
-The intended flow is: UI routes compose product features, Convex owns core data rules, OpenAPI exposes machine-facing routes, and MCP gives LLMs a thin programmable layer over that documented API surface.
+The intended flow is: UI routes compose product features, oRPC defines the canonical capability layer, Convex owns core data rules, OpenAPI exposes machine-facing routes, and MCP gives LLMs a thin programmable layer over that documented API surface.
 
 ## Example Patterns
 
@@ -162,11 +165,11 @@ Sliding-window rate limiter implemented as a Cloudflare Durable Object with alar
 
 ## Machine Access (REST and MCP)
 
-This repo exposes two machine interfaces: a REST API and an MCP server. Both require authentication.
+This repo exposes two machine interfaces: a REST API and an MCP server. Both are generated from the same oRPC capability layer.
 
 ### REST API (`/api/v1/*`)
 
-All REST endpoints require `Authorization: Bearer <api-key>`. Create an API key from the dashboard account menu.
+External REST clients should authenticate with `Authorization: Bearer <api-key>`. Same-origin app calls may also use the authenticated browser session when they go through the typed oRPC client.
 
 ```bash
 curl -X POST "https://your-app.example.com/api/v1/examples/sample/workflow?q=widget&limit=5&dryRun=true&channel=email" \
@@ -212,13 +215,15 @@ The MCP server exposes two tools:
 
 ### OpenAPI-driven MCP model
 
-The MCP integration is intentionally driven by the OpenAPI spec:
+The MCP integration is intentionally driven by the generated OpenAPI spec:
 
 - OpenAPI is the source of truth for executable API capabilities
 - `search-routes` is derived from the current OpenAPI catalog and returns compact, LLM-friendly route signatures
 - `execute` builds the sandbox `api.*` proxy from the executable OpenAPI route catalog instead of from hand-written MCP tools
 - adding or changing an OpenAPI route updates route discovery automatically
 - route execution still depends on the proxy conventions documented below, plus host-side auth forwarding and request validation
+
+Inside the app itself, SSR loaders and other server code should use the default server-side oRPC client instead of making HTTP self-calls.
 
 This keeps the MCP surface thin: route discovery happens through `search-routes`, and route orchestration happens inside `execute`.
 

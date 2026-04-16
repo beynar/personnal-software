@@ -1,13 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createFileRoute } from "@tanstack/react-router";
-import { auth } from "~/lib/auth";
 import {
-	MCP_SERVER_INFO,
-	createAuthInfo,
-	createRestAuthHeaders,
-	registerMcpTools,
-} from "~/lib/mcp";
+	type ApiAuthResult,
+	extractApiKey,
+	extractBearerApiKey,
+	resolveAuthSession,
+} from "~/lib/api-auth";
+import { auth } from "~/lib/auth";
+import { MCP_SERVER_INFO, createAuthInfo, registerMcpTools } from "~/lib/mcp";
+import { type McpSession, createRestAuthHeaders } from "~/lib/rest-auth";
 
 const CORS_HEADERS = {
 	"Access-Control-Allow-Origin": "*",
@@ -58,9 +60,36 @@ function createMcpServer(): McpServer {
 	return server;
 }
 
+function createApiKeyBackedMcpSession(session: ApiAuthResult): McpSession {
+	return {
+		accessToken: session.session.token,
+		refreshToken: session.session.token,
+		accessTokenExpiresAt: session.session.expiresAt,
+		refreshTokenExpiresAt: session.session.expiresAt,
+		clientId: "api-key",
+		userId: session.user.id,
+		scopes: "",
+	};
+}
+
+async function resolveApiKeyBackedMcpSession(
+	request: Request,
+): Promise<McpSession | null> {
+	const apiKey = extractBearerApiKey(request) ?? extractApiKey(request);
+	if (!apiKey) {
+		return null;
+	}
+
+	const authSession = await resolveAuthSession({
+		"x-api-key": apiKey,
+	});
+
+	return authSession ? createApiKeyBackedMcpSession(authSession) : null;
+}
+
 async function handleAuthenticatedMcpRequest(
 	request: Request,
-	session: NonNullable<Awaited<ReturnType<typeof auth.api.getMcpSession>>>,
+	session: McpSession,
 ): Promise<Response> {
 	const transport = new WebStandardStreamableHTTPServerTransport({
 		enableJsonResponse: true,
@@ -90,9 +119,10 @@ async function handleAuthenticatedMcpRequest(
 }
 
 async function handler(request: Request): Promise<Response> {
-	const session = await auth.api.getMcpSession({
-		headers: request.headers,
-	});
+	const session =
+		(await auth.api.getMcpSession({
+			headers: request.headers,
+		})) ?? (await resolveApiKeyBackedMcpSession(request));
 
 	if (!session) {
 		return createUnauthorizedResponse(request);

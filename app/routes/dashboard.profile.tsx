@@ -4,6 +4,12 @@ import { ProfileSettingsPage } from "~/components/profile/profile-settings-page"
 import { api } from "../../convex/_generated/api";
 
 export const Route = createFileRoute("/dashboard/profile")({
+	staticData: {
+		dashboardHeader: {
+			description: "Manage your account details and profile picture.",
+			title: "Profile",
+		},
+	},
 	component: DashboardProfileRoute,
 });
 

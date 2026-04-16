@@ -42,6 +42,13 @@ import { Separator } from "~/components/ui/separator";
 import { authClient } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/dashboard/organization-settings")({
+	staticData: {
+		dashboardHeader: {
+			description:
+				"Update the active organization profile and teammate access.",
+			title: "Organization settings",
+		},
+	},
 	component: OrganizationSettingsPage,
 });
 
@@ -742,7 +749,17 @@ function getInvitationId(invitation: InvitationLike) {
 
 function isOutstandingInvitation(invitation: InvitationLike) {
 	const status = invitation.status?.toLowerCase();
-	return !status || !["accepted", "canceled", "cancelled", "declined", "expired", "rejected"].includes(status);
+	return (
+		!status ||
+		![
+			"accepted",
+			"canceled",
+			"cancelled",
+			"declined",
+			"expired",
+			"rejected",
+		].includes(status)
+	);
 }
 
 function normalizeOptionalString(value: string) {

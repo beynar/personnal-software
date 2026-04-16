@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { apiApp } from "~/lib/api";
+import { handleApiRequest } from "~/lib/api";
 
-const handler = (request: Request) => apiApp.fetch(request);
+const handler = (request: Request) => handleApiRequest(request);
 
 export const Route = createFileRoute("/api/v1/$")({
 	server: {

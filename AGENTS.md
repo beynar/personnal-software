@@ -16,6 +16,7 @@ Read this first.
 
 - React 19
 - TanStack Start + TanStack Router
+- oRPC + OpenAPI
 - Convex
 - `@convex-dev/better-auth`
 - Tailwind CSS v4
@@ -83,11 +84,22 @@ Rules:
 - paginate or bound lists
 - keep Convex code grouped by domain
 
+## API Rules
+
+- user or agent capabilities belong in the oRPC contract/router layer first
+- `/api/v1/*` is generated from that oRPC layer and is the public machine surface
+- MCP route discovery and execution derive from the generated OpenAPI spec
+- page-initial server data should prefer TanStack loaders calling the default oRPC client from router context
+- browser session auth may be used by same-origin app calls, but external machine access still needs API-key or MCP auth
+- keep route files thin; do not hand-build new REST handlers in route files
+- keep business rules and ownership checks in Convex or dedicated backend modules behind oRPC procedures
+
 ## UI Rules
 
 - use existing primitives first
 - use tokens from `app/app.css`
 - keep user-facing pages under the dashboard layout when the sidebar should persist
+- when a dashboard page needs to control shell-owned chrome, declare `staticData.dashboardHeader` in the route definition instead of hard-coding page title/description/header blocks inside the page body
 - notifications use Sonner only
 - make new components work in light and dark mode
 - render new primitives on `/dashboard/design-system`

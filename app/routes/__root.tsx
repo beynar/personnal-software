@@ -3,7 +3,7 @@ import {
 	HeadContent,
 	Outlet,
 	Scripts,
-	createRootRoute,
+	createRootRouteWithContext,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { ConvexReactClient } from "convex/react";
@@ -12,6 +12,7 @@ import { Toaster } from "~/components/ui/sonner";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { authClient } from "~/lib/auth-client";
 import { PROJECT_NAME } from "~/lib/project";
+import type { AppRouterContext } from "~/router-context";
 import appCss from "../app.css?url";
 
 const faviconHref = `data:image/svg+xml,${encodeURIComponent(
@@ -35,7 +36,7 @@ function getConvexUrl() {
 const convexUrl = getConvexUrl();
 const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<AppRouterContext>()({
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },

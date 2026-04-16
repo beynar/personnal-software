@@ -2,7 +2,7 @@ import { normalizeCode, resolveProvider } from "@cloudflare/codemode";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { apiApp } from "~/lib/api";
+import { handleApiRequest } from "~/lib/api";
 import { getExecutor } from "~/lib/codemode";
 import {
 	type CatalogEntry,
@@ -11,21 +11,12 @@ import {
 	searchPublicCatalog,
 } from "~/lib/openapi-catalog";
 import { PROJECT_NAME } from "~/lib/project";
+import { type McpSession, createRestAuthHeaders } from "~/lib/rest-auth";
 
 export const MCP_SERVER_INFO = {
 	name: PROJECT_NAME,
 	version: "1.0.0",
 } as const;
-
-export type McpSession = {
-	accessToken: string;
-	refreshToken: string;
-	accessTokenExpiresAt: Date | string;
-	refreshTokenExpiresAt: Date | string;
-	clientId: string;
-	userId: string;
-	scopes: string;
-};
 
 type RestAuthContext = {
 	headers: Record<string, string>;
@@ -219,7 +210,7 @@ async function executeApiRoute(
 
 	const requestInit: RequestInit = { method, headers, body };
 	const request = new Request(`http://localhost${requestPath}`, requestInit);
-	const response = await apiApp.fetch(request);
+	const response = await handleApiRequest(request);
 	const rawBody = await response.arrayBuffer();
 	const truncated = rawBody.byteLength > MAX_BODY_BYTES;
 	const bodySlice = truncated ? rawBody.slice(0, MAX_BODY_BYTES) : rawBody;
@@ -446,24 +437,6 @@ export function createAuthInfo(session: McpSession): AuthInfo {
 			session,
 		},
 	};
-}
-
-export function createRestAuthHeaders(
-	headers: Headers,
-): Record<string, string> {
-	const forwarded = new Headers();
-	const apiKey = headers.get("x-api-key");
-	if (apiKey) {
-		forwarded.set("authorization", `Bearer ${apiKey}`);
-		return Object.fromEntries(forwarded.entries());
-	}
-
-	const authorization = headers.get("authorization");
-	if (authorization) {
-		forwarded.set("authorization", authorization);
-	}
-
-	return Object.fromEntries(forwarded.entries());
 }
 
 function buildExecutableRouteCatalog(): CatalogEntry[] {

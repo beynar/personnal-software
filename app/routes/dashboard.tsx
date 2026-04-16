@@ -4,14 +4,15 @@ import {
 	createFileRoute,
 	redirect,
 	useLocation,
+	useMatches,
 	useNavigate,
 } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import {
+	ArrowLeft,
 	BookOpen,
 	Building2,
 	ChevronsUpDown,
-	Command,
 	Copy,
 	Home,
 	Key,
@@ -25,20 +26,11 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ApiKeyDrawer } from "~/components/api-keys/api-key-drawer";
+import { DashboardSidebarCommandBar } from "~/components/dashboard/sidebar-command-bar";
 import { OrganizationSwitcher } from "~/components/organizations/organization-switcher";
 import { PendingInvitationsDrawer } from "~/components/organizations/pending-invitations-drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
-import {
-	CommandDialog,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-	CommandSeparator,
-	CommandShortcut,
-} from "~/components/ui/command";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -63,8 +55,10 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { authClient } from "~/lib/auth-client";
 import { checkBetterAuthSession } from "~/lib/auth.functions";
+import { getDashboardPageHeader } from "~/lib/dashboard-page-header";
 import { ensureOrganizationForSession } from "~/lib/organization";
 import { PROJECT_NAME } from "~/lib/project";
+import { cn } from "~/lib/utils";
 import { api } from "../../convex/_generated/api";
 
 const dashboardLinks = [
@@ -79,6 +73,12 @@ export const Route = createFileRoute("/dashboard")({
 			throw redirect({ to: "/" });
 		}
 	},
+	staticData: {
+		dashboardHeader: {
+			description: "Starter workspace with a persistent shell and nested pages",
+			title: "Dashboard",
+		},
+	},
 	component: DashboardLayoutRoute,
 });
 
@@ -89,9 +89,9 @@ function DashboardLayoutRoute() {
 function DashboardShell() {
 	const user = useQuery(api.users.viewer);
 	const syncViewerProfile = useMutation(api.users.syncViewerProfile);
+	const pageHeader = getDashboardPageHeader(useMatches());
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
-	const [commandOpen, setCommandOpen] = useState(false);
 	const [theme, setTheme] = useState<"light" | "dark">("light");
 	const { data: activeOrganization, isPending: loadingActiveOrganization } =
 		authClient.useActiveOrganization();
@@ -135,31 +135,6 @@ function DashboardShell() {
 		setTheme(root.classList.contains("dark") ? "dark" : "light");
 	}, []);
 
-	useEffect(() => {
-		function handleKeyDown(event: KeyboardEvent) {
-			if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
-				return;
-			}
-
-			const target = event.target;
-			if (
-				target instanceof HTMLElement &&
-				(target.isContentEditable ||
-					target instanceof HTMLInputElement ||
-					target instanceof HTMLTextAreaElement ||
-					target instanceof HTMLSelectElement)
-			) {
-				return;
-			}
-
-			event.preventDefault();
-			setCommandOpen(true);
-		}
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, []);
-
 	async function handleSignOut() {
 		await authClient.signOut();
 		navigate({ to: "/" });
@@ -187,7 +162,7 @@ function DashboardShell() {
 	return (
 		<SidebarProvider className="min-h-screen">
 			<Sidebar>
-				<SidebarHeader className="px-4 py-3 sm:px-3 h-18">
+				<SidebarHeader className="h-18 px-3 py-2.5">
 					<DashboardSidebarOrganizationSwitcher />
 				</SidebarHeader>
 				<SidebarContent>
@@ -207,129 +182,36 @@ function DashboardShell() {
 						))}
 					</SidebarMenu>
 				</SidebarContent>
-				<DashboardSidebarFooter onSignOut={handleSignOut} user={user} />
+				<DashboardSidebarFooter
+					onCopyMcpUrl={handleCopyMcpUrl}
+					onSignOut={handleSignOut}
+					onThemeChange={applyTheme}
+					theme={theme}
+					user={user}
+				/>
 			</Sidebar>
 			<SidebarInset>
-				<header className="sticky top-0 z-10 border-b border-border/70 bg-background/95 backdrop-blur h-18">
-					<div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
+				<header className="sticky top-0 z-10 h-18 border-b border-border/70 bg-background/95 backdrop-blur">
+					<div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6">
 						<div className="flex items-center gap-3">
-						<SidebarTrigger />
+							<SidebarTrigger />
+							{pageHeader?.backHref ? (
+								<Button asChild size="icon-sm" type="button" variant="ghost">
+									<Link to={pageHeader.backHref}>
+										<ArrowLeft className="size-4" />
+										<span className="sr-only">Go back</span>
+									</Link>
+								</Button>
+							) : null}
 							<div className="min-w-0">
-								<p className="text-sm font-medium text-foreground">Dashboard</p>
+								<p className="text-sm font-medium text-foreground">
+									{pageHeader?.title}
+								</p>
 								<p className="truncate text-sm text-muted-foreground">
-									Starter workspace with a persistent shell and nested pages
+									{pageHeader?.description}
 								</p>
 							</div>
 						</div>
-						<Button
-							className="h-10 min-w-[13rem] justify-between rounded-xl border-border/70 px-3 text-muted-foreground"
-							onClick={() => setCommandOpen(true)}
-							type="button"
-							variant="outline"
-						>
-							<span className="flex items-center gap-2">
-								<Command className="size-4" />
-								<span className="text-sm">Search commands</span>
-							</span>
-							<CommandShortcut className="ml-3 hidden sm:inline-flex">
-								⌘K
-							</CommandShortcut>
-						</Button>
-						<CommandDialog
-							description="Search navigation and workspace actions."
-							onOpenChange={setCommandOpen}
-							open={commandOpen}
-							title="Dashboard commands"
-						>
-							<CommandInput placeholder="Search commands..." />
-							<CommandList>
-								<CommandEmpty>No results found.</CommandEmpty>
-								<CommandGroup heading="Navigation">
-									<CommandItem
-										onSelect={() => {
-											setCommandOpen(false);
-											void navigate({ to: "/dashboard" });
-										}}
-									>
-										<Home className="size-4" />
-										Overview
-									</CommandItem>
-									<CommandItem
-										onSelect={() => {
-											setCommandOpen(false);
-											void navigate({ to: "/dashboard/design-system" });
-										}}
-									>
-										<Layers3 className="size-4" />
-										Design System
-									</CommandItem>
-									<CommandItem
-										onSelect={() => {
-											setCommandOpen(false);
-											void navigate({ to: "/dashboard/profile" });
-										}}
-									>
-										<UserRound className="size-4" />
-										Profile
-									</CommandItem>
-									{activeOrganization ? (
-										<CommandItem
-											onSelect={() => {
-												setCommandOpen(false);
-												void navigate({
-													to: "/dashboard/organization-settings",
-												});
-											}}
-										>
-											<Building2 className="size-4" />
-											Organization settings
-										</CommandItem>
-									) : null}
-								</CommandGroup>
-								<CommandSeparator />
-								<CommandGroup heading="Actions">
-									{theme === "dark" ? (
-										<CommandItem
-											onSelect={() => {
-												setCommandOpen(false);
-												applyTheme("light");
-											}}
-										>
-											<Sun className="size-4" />
-											Light mode
-										</CommandItem>
-									) : (
-										<CommandItem
-											onSelect={() => {
-												setCommandOpen(false);
-												applyTheme("dark");
-											}}
-										>
-											<Moon className="size-4" />
-											Dark mode
-										</CommandItem>
-									)}
-									<CommandItem
-										onSelect={() => {
-											setCommandOpen(false);
-											void handleCopyMcpUrl();
-										}}
-									>
-										<Copy className="size-4" />
-										Copy MCP URL
-									</CommandItem>
-									<CommandItem
-										onSelect={() => {
-											setCommandOpen(false);
-											void handleSignOut();
-										}}
-									>
-										<LogOut className="size-4" />
-										Sign out
-									</CommandItem>
-								</CommandGroup>
-							</CommandList>
-						</CommandDialog>
 					</div>
 				</header>
 				<div className="flex flex-1 flex-col px-4 py-6 sm:px-6">
@@ -348,11 +230,13 @@ function DashboardSidebarOrganizationSwitcher() {
 
 function SessionFooter({
 	activeOrganization,
+	className,
 	onCopyMcpUrl,
 	onSignOut,
 	user,
 }: {
 	activeOrganization: { id: string } | null | undefined;
+	className?: string;
 	onCopyMcpUrl: () => Promise<void>;
 	user:
 		| {
@@ -369,7 +253,7 @@ function SessionFooter({
 		useState(false);
 
 	if (user === undefined) {
-		return <SessionFooterSkeleton />;
+		return <SessionFooterSkeleton className={className} />;
 	}
 
 	const userLabel = user?.name ?? user?.email ?? "Signed in";
@@ -386,15 +270,15 @@ function SessionFooter({
 				open={pendingInvitationsDrawerOpen}
 				showTrigger={false}
 			/>
-			<div className="rounded-xl border border-border/70 bg-background/80">
+			<div className={cn("rounded-xl", className)}>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
-							className="h-auto w-full justify-between rounded-lg px-2 py-2.5"
+							className="h-11 w-full justify-between rounded-xl px-2.5"
 							variant="ghost"
 						>
 							<div className="flex min-w-0 items-center gap-3 text-left">
-								<Avatar className="size-10 border border-border/70" size="lg">
+								<Avatar className="size-8 border border-border/70" size="lg">
 									<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
 									<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
 								</Avatar>
@@ -408,7 +292,13 @@ function SessionFooter({
 							<ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
 						</Button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" className="w-56" side="right">
+					<DropdownMenuContent
+						align="start"
+						className="w-56"
+						collisionPadding={12}
+						side="right"
+						sideOffset={10}
+					>
 						<AccountMenuItems
 							activeOrganization={activeOrganization}
 							onCopyMcpUrl={onCopyMcpUrl}
@@ -481,27 +371,43 @@ function AccountMenuItems({
 	);
 }
 
-function SessionFooterSkeleton() {
+function SessionFooterSkeleton({ className }: { className?: string }) {
 	return (
-		<div className="rounded-xl border border-border/70 bg-background/80">
-			<div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5">
-				<div className="flex min-w-0 items-center gap-3">
-					<Skeleton className="size-10 shrink-0 rounded-full" />
-					<div className="min-w-0 flex-1 space-y-2">
-						<Skeleton className="h-4 w-28 rounded-md" />
-						<Skeleton className="h-3 w-36 rounded-md" />
+		<div className={cn("min-w-0 flex-1 rounded-xl", className)}>
+			<div className="h-11 w-full px-2.5">
+				<div className="flex h-full items-center justify-between gap-3">
+					<div className="flex min-w-0 items-center gap-3">
+						<Skeleton className="size-8 shrink-0 rounded-full" />
+						<div className="min-w-0 flex-1 space-y-1.5">
+							<Skeleton className="h-3.5 w-24 rounded-md" />
+							<Skeleton className="h-3 w-32 rounded-md" />
+						</div>
 					</div>
+					<Skeleton className="size-4 shrink-0 rounded-sm" />
 				</div>
-				<Skeleton className="size-4 shrink-0 rounded-sm" />
 			</div>
 		</div>
 	);
 }
 
+function CollapsedSessionFooterSkeleton() {
+	return (
+		<div className="flex h-16 w-full items-center justify-center rounded-none border-0">
+			<Skeleton className="size-9 rounded-full" />
+		</div>
+	);
+}
+
 function DashboardSidebarFooter({
+	onCopyMcpUrl,
+	onThemeChange,
+	theme,
 	user,
 	onSignOut,
 }: {
+	onCopyMcpUrl: () => Promise<void>;
+	onThemeChange: (theme: "light" | "dark") => void;
+	theme: "light" | "dark";
 	user:
 		| {
 				email?: string;
@@ -519,20 +425,28 @@ function DashboardSidebarFooter({
 		useState(false);
 	const userLabel = user?.name ?? user?.email ?? "Signed in";
 
-	async function handleCopyMcpUrl() {
-		const mcpUrl = `${window.location.origin}/api/mcp`;
-
-		try {
-			await navigator.clipboard.writeText(mcpUrl);
-			toast.success("MCP URL copied");
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to copy MCP URL",
+	if (isCollapsed && !isMobile) {
+		if (user === undefined) {
+			return (
+				<SidebarFooter className="p-0">
+					<DashboardSidebarCommandBar
+						onCopyMcpUrl={onCopyMcpUrl}
+						onSignOut={onSignOut}
+						onThemeChange={onThemeChange}
+						theme={theme}
+					/>
+					<ThemeToggle
+						className="m-0 h-16 w-full rounded-none border-b border-border/70"
+						onThemeChange={onThemeChange}
+						size="icon"
+						theme={theme}
+						variant="ghost"
+					/>
+					<CollapsedSessionFooterSkeleton />
+				</SidebarFooter>
 			);
 		}
-	}
 
-	if (isCollapsed && !isMobile) {
 		return (
 			<SidebarFooter className="p-0">
 				<ApiKeyDrawer
@@ -540,14 +454,22 @@ function DashboardSidebarFooter({
 					open={apiKeyDrawerOpen}
 					showTrigger={false}
 				/>
+				<DashboardSidebarCommandBar
+					onCopyMcpUrl={onCopyMcpUrl}
+					onSignOut={onSignOut}
+					onThemeChange={onThemeChange}
+					theme={theme}
+				/>
 				<PendingInvitationsDrawer
 					onOpenChange={setPendingInvitationsDrawerOpen}
 					open={pendingInvitationsDrawerOpen}
 					showTrigger={false}
 				/>
 				<ThemeToggle
-					className="m-0 h-16 w-full rounded-none border-b border-border-70"
+					className="m-0 h-16 w-full rounded-none border-b border-border/70"
+					onThemeChange={onThemeChange}
 					size="icon"
+					theme={theme}
 					variant="ghost"
 				/>
 				<DropdownMenu>
@@ -564,10 +486,15 @@ function DashboardSidebarFooter({
 							<span className="sr-only">Open account menu</span>
 						</Button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" side="right">
+					<DropdownMenuContent
+						align="start"
+						collisionPadding={12}
+						side="right"
+						sideOffset={10}
+					>
 						<AccountMenuItems
 							activeOrganization={activeOrganization}
-							onCopyMcpUrl={handleCopyMcpUrl}
+							onCopyMcpUrl={onCopyMcpUrl}
 							onOpenApiKeys={() => setApiKeyDrawerOpen(true)}
 							onOpenPendingInvitations={() =>
 								setPendingInvitationsDrawerOpen(true)
@@ -581,48 +508,73 @@ function DashboardSidebarFooter({
 	}
 
 	return (
-		<SidebarFooter className="gap-4 flex flex-col">
-			<ThemeToggle />
-			<SessionFooter
-				activeOrganization={activeOrganization}
-				onCopyMcpUrl={handleCopyMcpUrl}
+		<SidebarFooter className="space-y-2">
+			<DashboardSidebarCommandBar
+				onCopyMcpUrl={onCopyMcpUrl}
 				onSignOut={onSignOut}
-				user={user}
+				onThemeChange={onThemeChange}
+				theme={theme}
 			/>
+			<div className="flex items-center gap-2">
+				<SessionFooter
+					activeOrganization={activeOrganization}
+					className="min-w-0 flex-1"
+					onCopyMcpUrl={onCopyMcpUrl}
+					onSignOut={onSignOut}
+					user={user}
+				/>
+				<ThemeToggle compact onThemeChange={onThemeChange} theme={theme} />
+			</div>
 		</SidebarFooter>
 	);
 }
 
 function ThemeToggle({
 	className,
+	compact = false,
+	onThemeChange,
 	size = "default",
+	theme,
 	variant = "outline",
 }: Pick<
 	React.ComponentProps<typeof Button>,
 	"className" | "size" | "variant"
->) {
+> & {
+	compact?: boolean;
+	onThemeChange: (theme: "light" | "dark") => void;
+	theme: "light" | "dark";
+}) {
 	const { isCollapsed, isMobile } = useSidebar();
-	const [theme, setTheme] = useState<"light" | "dark">("light");
-
-	useEffect(() => {
-		const root = document.documentElement;
-		setTheme(root.classList.contains("dark") ? "dark" : "light");
-	}, []);
 
 	function toggleTheme() {
-		const nextTheme = theme === "dark" ? "light" : "dark";
-		document.documentElement.classList.toggle("dark", nextTheme === "dark");
-		window.localStorage.setItem("theme", nextTheme);
-		setTheme(nextTheme);
+		onThemeChange(theme === "dark" ? "light" : "dark");
 	}
 
 	const Icon = theme === "dark" ? Sun : Moon;
 	const label = theme === "dark" ? "Light mode" : "Dark mode";
 
+	if (compact) {
+		return (
+			<Button
+				className={cn("size-11 rounded-xl", className)}
+				onClick={toggleTheme}
+				size="icon"
+				type="button"
+				variant="ghost"
+			>
+				<Icon className="size-4" />
+				<span className="sr-only">{label}</span>
+			</Button>
+		);
+	}
+
 	if (!isCollapsed || isMobile) {
 		return (
 			<div
-				className={`flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2.5 ${className ?? ""}`}
+				className={cn(
+					"flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2",
+					className,
+				)}
 			>
 				<div className="flex min-w-0 items-center gap-3">
 					<div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -635,12 +587,9 @@ function ThemeToggle({
 				<Switch
 					aria-labelledby="theme-toggle-label"
 					checked={theme === "dark"}
-					onCheckedChange={(checked) => {
-						const nextTheme = checked ? "dark" : "light";
-						document.documentElement.classList.toggle("dark", checked);
-						window.localStorage.setItem("theme", nextTheme);
-						setTheme(nextTheme);
-					}}
+					onCheckedChange={(checked) =>
+						onThemeChange(checked ? "dark" : "light")
+					}
 				/>
 			</div>
 		);

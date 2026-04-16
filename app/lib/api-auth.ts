@@ -1,17 +1,4 @@
-/**
- * Shared server-side auth helper for validating API keys.
- *
- * Calls Better Auth's /get-session endpoint with the x-api-key header,
- * which — thanks to enableSessionForAPIKeys — returns a normalized
- * user + session result without a second lookup.
- *
- * Usage:
- *   const result = await validateApiKey(apiKey);
- *   if (!result) return new Response("Unauthorized", { status: 401 });
- *   // result.user and result.session are available
- */
-
-const convexSiteUrl = import.meta.env.VITE_CONVEX_SITE_URL as string;
+import { handler as authHandler } from "~/lib/auth-server";
 
 export interface ApiAuthUser {
 	id: string;
@@ -35,29 +22,59 @@ export interface ApiAuthResult {
 	session: ApiAuthSession;
 }
 
+function createAuthRequest(headers: HeadersInit): Request {
+	return new Request("http://local/api/auth/get-session", {
+		method: "GET",
+		headers: new Headers(headers),
+	});
+}
+
 /**
- * Validates an API key by calling Better Auth's /get-session with the
- * x-api-key header. The API key plugin's enableSessionForAPIKeys option
- * causes the plugin to intercept the request, verify the key, and return
- * a mock session — no separate verifyApiKey + session lookup needed.
- *
- * Returns the user and session if valid, or null otherwise.
+ * Resolves the current Better Auth browser session or API-key-backed session.
+ * Invalid credentials return null. Transport or auth service failures surface.
+ */
+export async function resolveAuthSession(
+	headers: HeadersInit,
+): Promise<ApiAuthResult | null> {
+	const response = await authHandler(createAuthRequest(headers));
+
+	if (response.status === 401) {
+		return null;
+	}
+
+	if (!response.ok) {
+		throw new Error(
+			`Better Auth session lookup failed with status ${response.status}`,
+		);
+	}
+
+	const data = (await response.json()) as
+		| ApiAuthResult
+		| {
+				user?: ApiAuthUser | null;
+				session?: ApiAuthSession | null;
+		  }
+		| null;
+
+	if (!data?.user || !data.session) {
+		return null;
+	}
+
+	return {
+		user: data.user,
+		session: data.session,
+	};
+}
+
+/**
+ * Validates an API key via Better Auth's session endpoint.
  */
 export async function validateApiKey(
 	apiKey: string,
 ): Promise<ApiAuthResult | null> {
-	console.log({ apiKey });
-	try {
-		const response = await fetch(`${convexSiteUrl}/api/auth/get-session`, {
-			headers: { "x-api-key": apiKey },
-		});
-		if (!response.ok) return null;
-		const data = (await response.json()) as Record<string, unknown>;
-		if (!data?.user) return null;
-		return data as unknown as ApiAuthResult;
-	} catch {
-		return null;
-	}
+	return resolveAuthSession({
+		"x-api-key": apiKey,
+	});
 }
 
 /**
@@ -74,7 +91,9 @@ export function extractApiKey(request: Request): string | null {
  */
 export function extractBearerApiKey(request: Request): string | null {
 	const authHeader = request.headers.get("authorization");
-	if (!authHeader) return null;
+	if (!authHeader) {
+		return null;
+	}
 
 	const [scheme, token] = authHeader.split(" ");
 	if (scheme?.toLowerCase() !== "bearer" || !token) {
