@@ -6,31 +6,18 @@ const convexSiteUrl = import.meta.env.VITE_CONVEX_SITE_URL as string;
 const upstream = convexBetterAuthReactStart({
 	convexUrl,
 	convexSiteUrl,
+	jwtCache: {
+		enabled: true,
+		expirationToleranceSeconds: 60,
+		isAuthError,
+	},
 });
 
 export const getToken = upstream.getToken;
 
 export const handler = async (request: Request): Promise<Response> => {
 	try {
-		const requestUrl = new URL(request.url);
-		const nextUrl = `${convexSiteUrl}${requestUrl.pathname}${requestUrl.search}`;
-		const headers = new Headers(request.headers);
-		headers.delete("host");
-		headers.delete("referer");
-		headers.delete("content-length");
-		headers.delete("transfer-encoding");
-
-		const body =
-			request.method === "GET" || request.method === "HEAD"
-				? undefined
-				: await request.arrayBuffer();
-
-		return await fetch(nextUrl, {
-			method: request.method,
-			headers,
-			redirect: "manual",
-			body,
-		});
+		return await upstream.handler(request);
 	} catch (err) {
 		console.error("[auth-handler] caught error:", err);
 		return Response.json(
@@ -42,3 +29,13 @@ export const handler = async (request: Request): Promise<Response> => {
 
 export const fetchAuthQuery = upstream.fetchAuthQuery;
 export const fetchAuthMutation = upstream.fetchAuthMutation;
+
+function isAuthError(error: unknown) {
+	if (!(error instanceof Error)) {
+		return false;
+	}
+
+	return /\b(unauthenticated|unauthorized|not authenticated)\b/i.test(
+		error.message,
+	);
+}

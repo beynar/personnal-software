@@ -139,6 +139,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				toast.error(authError.message ?? "Failed to create account");
 				return;
 			}
+			await waitForAuthSession();
 			await ensureOrganizationForSession(authClient, { email, name });
 			if (onAuthSuccess) {
 				onAuthSuccess();
@@ -215,4 +216,48 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 			</Button>
 		</form>
 	);
+}
+
+async function waitForAuthSession() {
+	for (let attempt = 0; attempt < 5; attempt += 1) {
+		const { data, error } = await authClient.getSession();
+		if (hasSession(data)) {
+			return;
+		}
+
+		if (error && attempt === 4) {
+			throw new Error(error.message ?? "Failed to load account session");
+		}
+
+		await delay(100 * (attempt + 1));
+	}
+
+	throw new Error("Account created, but the session is not ready yet");
+}
+
+function hasSession(value: unknown) {
+	return Boolean(
+		readNestedString(value, "user", "id") ??
+			readNestedString(value, "session", "userId"),
+	);
+}
+
+function delay(ms: number) {
+	return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function readNestedString(value: unknown, objectKey: string, fieldKey: string) {
+	if (!value || typeof value !== "object") {
+		return null;
+	}
+
+	const record = value as Record<string, unknown>;
+	const nested = record[objectKey];
+	if (!nested || typeof nested !== "object") {
+		return null;
+	}
+
+	const nestedRecord = nested as Record<string, unknown>;
+	const fieldValue = nestedRecord[fieldKey];
+	return typeof fieldValue === "string" ? fieldValue : null;
 }

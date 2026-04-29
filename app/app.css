@@ -204,6 +204,23 @@
 	}
 }
 
+@keyframes navigation-progress {
+	from {
+		transform: translateX(-110%) scaleX(0.35);
+	}
+	55% {
+		transform: translateX(10%) scaleX(0.8);
+	}
+	to {
+		transform: translateX(150%) scaleX(0.45);
+	}
+}
+
+.navigation-progress-bar {
+	animation: navigation-progress 1.1s ease-in-out infinite;
+	transform-origin: left center;
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;

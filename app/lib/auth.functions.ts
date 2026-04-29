@@ -1,19 +1,26 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getToken } from "~/lib/auth-server";
 
+export type BetterAuthSessionStatus =
+	| "anonymous"
+	| "authenticated"
+	| "unavailable";
+
 /**
- * Server function that checks whether the current request has a valid
- * Better Auth session.  Used by route `beforeLoad` guards to decide
- * whether to redirect.
+ * Resolves the current request session without collapsing auth transport
+ * failures into an anonymous user. Route guards can avoid false logout
+ * redirects while Convex still enforces data access server-side.
  */
-export const checkBetterAuthSession = createServerFn({
-	method: "GET",
-}).handler(async () => {
+async function resolveBetterAuthSessionStatus(): Promise<BetterAuthSessionStatus> {
 	try {
 		const token = await getToken();
-		return !!token;
+		return token ? "authenticated" : "anonymous";
 	} catch (err) {
-		console.error("[checkBetterAuthSession] caught error:", err);
-		return false;
+		console.error("[auth-session] Better Auth session check unavailable:", err);
+		return "unavailable";
 	}
-});
+}
+
+export const getBetterAuthSessionStatus = createServerFn({
+	method: "GET",
+}).handler(resolveBetterAuthSessionStatus);

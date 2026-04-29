@@ -53,7 +53,7 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { authClient } from "~/lib/auth-client";
-import { checkBetterAuthSession } from "~/lib/auth.functions";
+import { getBetterAuthSessionStatus } from "~/lib/auth.functions";
 import { getDashboardPageHeader } from "~/lib/dashboard-page-header";
 import { ensureOrganizationForSession } from "~/lib/organization";
 import { PROJECT_NAME } from "~/lib/project";
@@ -67,8 +67,8 @@ const dashboardLinks = [
 
 export const Route = createFileRoute("/dashboard")({
 	beforeLoad: async () => {
-		const isAuthenticated = await checkBetterAuthSession();
-		if (!isAuthenticated) {
+		const authStatus = await getBetterAuthSessionStatus();
+		if (authStatus === "anonymous") {
 			throw redirect({ to: "/" });
 		}
 	},

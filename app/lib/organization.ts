@@ -9,6 +9,11 @@ type OrganizationSummary = {
 	name: string;
 };
 
+type OrganizationCandidate = {
+	name: string;
+	slug: string;
+};
+
 type SessionUser = {
 	email?: string | null;
 	name?: string | null;
@@ -33,6 +38,11 @@ export async function ensureOrganizationForSession(
 	// query the server so we don't blindly create a duplicate org.
 	if (!organizations) {
 		const listResult = await client.organization.list();
+		const listError = readErrorMessage(listResult);
+		if (listError) {
+			throw new Error(listError);
+		}
+
 		organizations =
 			(Array.isArray(listResult?.data) ? listResult.data : null) ??
 			(Array.isArray(listResult) ? listResult : null);
@@ -54,16 +64,64 @@ export async function ensureOrganizationForSession(
 		return firstOrganizationId;
 	}
 
-	const personalName = getPersonalOrganizationName(user);
+	return await createPersonalOrganization(client, user);
+}
+
+async function createPersonalOrganization(
+	client: AuthClient,
+	user: SessionUser,
+) {
+	const baseName = getPersonalOrganizationName(user);
 	const baseSlug = getPersonalOrganizationSlugBase(user);
-	const slug = await reserveOrganizationSlug(client, baseSlug);
+
+	for (let suffix = 0; suffix < 100; suffix += 1) {
+		const candidate = getOrganizationCandidate(baseName, baseSlug, suffix);
+		const isSlugAvailable = await checkOrganizationSlug(client, candidate.slug);
+		if (!isSlugAvailable) {
+			continue;
+		}
+
+		const organizationId = await tryCreateOrganization(client, candidate);
+		if (organizationId) {
+			return organizationId;
+		}
+	}
+
+	throw new Error("Failed to create a personal organization");
+}
+
+async function checkOrganizationSlug(client: AuthClient, slug: string) {
+	const { data, error } = await client.organization.checkSlug({ slug });
+
+	if (error) {
+		if (isOrganizationSlugConflict(error)) {
+			return false;
+		}
+
+		throw new Error(
+			error.message ?? "Failed to validate personal organization slug",
+		);
+	}
+
+	const status = readBoolean(data, "status");
+	return status === true;
+}
+
+async function tryCreateOrganization(
+	client: AuthClient,
+	candidate: OrganizationCandidate,
+) {
 	const { data, error } = await client.organization.create({
 		keepCurrentActiveOrganization: false,
-		name: personalName,
-		slug,
+		name: candidate.name,
+		slug: candidate.slug,
 	});
 
 	if (error) {
+		if (isOrganizationSlugConflict(error)) {
+			return null;
+		}
+
 		throw new Error(error.message ?? "Failed to create personal organization");
 	}
 
@@ -76,36 +134,35 @@ export async function ensureOrganizationForSession(
 	}
 
 	const refreshedOrganizations = await client.organization.list();
-	const refreshedOrganizationId =
-		readFirstOrganizationId(refreshedOrganizations?.data) ??
-		readFirstOrganizationId(refreshedOrganizations);
-	return refreshedOrganizationId ?? null;
-}
-
-async function reserveOrganizationSlug(client: AuthClient, baseSlug: string) {
-	const normalizedBaseSlug = baseSlug || "personal-organization";
-
-	for (let suffix = 0; suffix < 100; suffix += 1) {
-		const candidate =
-			suffix === 0 ? normalizedBaseSlug : `${normalizedBaseSlug}-${suffix + 1}`;
-		const { data, error } = await client.organization.checkSlug({
-			slug: candidate,
-		});
-
-		if (error) {
-			throw new Error(error.message ?? "Failed to validate organization slug");
-		}
-
-		const status =
-			readBoolean(data, "available") ??
-			readBoolean(data, "isAvailable") ??
-			readBoolean(data, "valid");
-		if (status !== false) {
-			return candidate;
-		}
+	const refreshedListError = readErrorMessage(refreshedOrganizations);
+	if (refreshedListError) {
+		throw new Error(refreshedListError);
 	}
 
-	throw new Error("Failed to reserve a personal organization slug");
+	return (
+		readFirstOrganizationId(refreshedOrganizations?.data) ??
+		readFirstOrganizationId(refreshedOrganizations)
+	);
+}
+
+function getOrganizationCandidate(
+	baseName: string,
+	baseSlug: string,
+	suffix: number,
+): OrganizationCandidate {
+	const normalizedBaseSlug = baseSlug || "personal-organization";
+	if (suffix === 0) {
+		return {
+			name: baseName,
+			slug: normalizedBaseSlug,
+		};
+	}
+
+	const number = suffix + 1;
+	return {
+		name: `${baseName} ${number}`,
+		slug: `${normalizedBaseSlug}-${number}`,
+	};
 }
 
 function getPersonalOrganizationName(user: SessionUser) {
@@ -183,4 +240,24 @@ function readFirstOrganizationId(value: unknown) {
 	}
 
 	return null;
+}
+
+function readErrorMessage(value: unknown) {
+	if (!value || typeof value !== "object") {
+		return null;
+	}
+
+	const error = (value as { error?: unknown }).error;
+	return readString(error, "message");
+}
+
+function isOrganizationSlugConflict(error: unknown) {
+	const code = readString(error, "code");
+	const message = readString(error, "message") ?? "";
+
+	return (
+		code === "ORGANIZATION_ALREADY_EXISTS" ||
+		code === "ORGANIZATION_SLUG_ALREADY_TAKEN" ||
+		/\borganization\b.*\b(already exists|slug already taken)\b/i.test(message)
+	);
 }

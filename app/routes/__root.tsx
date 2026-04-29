@@ -8,6 +8,7 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { ConvexReactClient } from "convex/react";
 import type { ReactNode } from "react";
+import { NavigationProgress } from "~/components/navigation-progress";
 import { Toaster } from "~/components/ui/sonner";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { authClient } from "~/lib/auth-client";
@@ -83,6 +84,7 @@ function RootDocument({ children }: { children: ReactNode }) {
 			</head>
 			<body className="min-h-screen antialiased">
 				<TooltipProvider>
+					<NavigationProgress />
 					{children}
 					<Toaster richColors />
 					<TanStackRouterDevtools position="bottom-right" />
