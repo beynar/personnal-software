@@ -47,7 +47,7 @@ type LatestCreatedKey = {
 } | null;
 
 /**
- * Opens a sidebar drawer for listing, creating, and deleting API keys.
+ * Opens a sidebar drawer for listing, creating, and deleting Clés API.
  */
 export function ApiKeyDrawer({
 	collapsed = false,
@@ -82,7 +82,7 @@ export function ApiKeyDrawer({
 		setLoading(false);
 
 		if (listError) {
-			setError(listError.message ?? "Failed to load API keys");
+			setError(listError.message ?? "Chargement des clés API impossible");
 			return;
 		}
 
@@ -112,19 +112,20 @@ export function ApiKeyDrawer({
 					>
 						<Key className="size-4" />
 						{collapsed ? (
-							<span className="sr-only">API keys</span>
+							<span className="sr-only">Clés API</span>
 						) : (
-							<span>API keys</span>
+							<span>Clés API</span>
 						)}
 					</Button>
 				</DrawerTrigger>
 			) : null}
 			<DrawerContent className="w-full border-border/70 sm:w-[40rem] sm:max-w-[40rem]">
 				<DrawerHeader className="border-b border-border/70 px-6 py-5 text-left">
-					<DrawerTitle className="text-lg">API keys</DrawerTitle>
+					<DrawerTitle className="text-lg">Clés API</DrawerTitle>
 					<DrawerDescription className="max-w-lg text-sm leading-6">
-						Create and manage machine credentials from the sidebar. The latest
-						raw key stays visible here until you dismiss it or reload.
+						Créez et gérez les identifiants machine depuis la barre latérale. La
+						dernière clé complète reste visible ici jusqu’à fermeture ou
+						rechargement.
 					</DrawerDescription>
 				</DrawerHeader>
 				<div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
@@ -142,22 +143,23 @@ export function ApiKeyDrawer({
 					) : null}
 					<div className="space-y-3">
 						<div>
-							<h3 className="text-sm font-medium text-foreground">Your keys</h3>
+							<h3 className="text-sm font-medium text-foreground">Vos clés</h3>
 							<p className="text-sm text-muted-foreground">
-								Existing keys only expose their prefix for security.
+								Les clés existantes n’affichent que leur préfixe pour des
+								raisons de sécurité.
 							</p>
 						</div>
 						{error ? <p className="text-sm text-destructive">{error}</p> : null}
 						{loading ? (
 							<div className="flex items-center justify-center rounded-xl border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
 								<Loader2 className="mr-2 size-4 animate-spin" />
-								Loading API keys
+								Chargement des clés API
 							</div>
 						) : !keys.length ? (
 							<div className="rounded-xl border border-dashed border-border/70 bg-muted/30 p-8 text-center">
 								<Key className="mx-auto size-8 text-muted-foreground/60" />
 								<p className="mt-3 text-sm text-muted-foreground">
-									No API keys yet. Create one above to get started.
+									Aucune clé API. Créez-en une ci-dessus pour commencer.
 								</p>
 							</div>
 						) : (
@@ -199,7 +201,7 @@ function CreateApiKeyForm({
 		setCreating(false);
 
 		if (createError) {
-			setError(createError.message ?? "Failed to create API key");
+			setError(createError.message ?? "Création de la clé API impossible");
 			return;
 		}
 
@@ -214,10 +216,11 @@ function CreateApiKeyForm({
 		<div className="space-y-4 rounded-2xl border border-border/70 bg-background/60 p-4">
 			<div className="space-y-1">
 				<h3 className="text-sm font-medium text-foreground">
-					Create a new API key
+					Créer une clé API
 				</h3>
 				<p className="text-sm text-muted-foreground">
-					Name the key after its integration or workflow so it stays legible.
+					Nommez la clé selon son intégration ou son usage pour la reconnaître
+					facilement.
 				</p>
 			</div>
 			<form
@@ -225,7 +228,7 @@ function CreateApiKeyForm({
 				onSubmit={handleCreate}
 			>
 				<div className="flex-1 space-y-2">
-					<Label htmlFor="key-name">Name</Label>
+					<Label htmlFor="key-name">Nom</Label>
 					<Input
 						id="key-name"
 						onChange={(event) => setName(event.target.value)}
@@ -239,7 +242,7 @@ function CreateApiKeyForm({
 					) : (
 						<Plus className="size-4" />
 					)}
-					{creating ? "Creating..." : "Create key"}
+					{creating ? "Création..." : "Créer la clé"}
 				</Button>
 			</form>
 			{error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -265,8 +268,8 @@ function NewKeyBanner({
 	return (
 		<div className="space-y-3 rounded-2xl border border-green-500/30 bg-green-500/5 p-4">
 			<p className="text-sm text-muted-foreground">
-				This full value is only returned when the key is created, so keep it
-				safe before dismissing it.
+				Cette valeur complète n’est affichée qu’à la création. Conservez-la
+				avant de fermer ce message.
 			</p>
 			<div className="flex items-center gap-2">
 				<code className="flex-1 break-all rounded-2xl border border-border/70 bg-accent px-3 py-2 font-mono text-sm select-all">
@@ -278,11 +281,11 @@ function NewKeyBanner({
 					) : (
 						<Copy className="size-4" />
 					)}
-					<span className="sr-only">Copy</span>
+					<span className="sr-only">Copier</span>
 				</Button>
 			</div>
 			<Button onClick={onDismiss} size="sm" variant="ghost">
-				Dismiss
+				Fermer
 			</Button>
 		</div>
 	);
@@ -306,11 +309,13 @@ function ApiKeyRow({
 		try {
 			await authClient.apiKey.delete({ keyId: apiKey.id });
 			setDeleteDialogOpen(false);
-			toast.success("API key deleted");
+			toast.success("Clé API supprimée");
 			onDeleted();
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to delete API key",
+				error instanceof Error
+					? error.message
+					: "Suppression de la clé API impossible",
 			);
 		} finally {
 			setDeleting(false);
@@ -324,20 +329,20 @@ function ApiKeyRow({
 				enabled: !apiKey.enabled,
 				keyId: apiKey.id,
 			});
-			toast.success(
-				apiKey.enabled ? "API key deactivated" : "API key activated",
-			);
+			toast.success(apiKey.enabled ? "Clé API désactivée" : "Clé API activée");
 			onUpdated();
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to update API key",
+				error instanceof Error
+					? error.message
+					: "Mise à jour de la clé API impossible",
 			);
 		} finally {
 			setUpdating(false);
 		}
 	}
 
-	const label = apiKey.name || apiKey.start || "Unnamed key";
+	const label = apiKey.name || apiKey.start || "Clé sans nom";
 	const createdDate = new Date(apiKey.createdAt).toLocaleDateString();
 
 	return (
@@ -350,7 +355,9 @@ function ApiKeyRow({
 								{label}
 							</p>
 							<p className="mt-1 text-sm font-mono text-muted-foreground">
-								{apiKey.start ? `${apiKey.start}••••` : "No prefix available"}
+								{apiKey.start
+									? `${apiKey.start}••••`
+									: "Aucun préfixe disponible"}
 							</p>
 						</div>
 						<DropdownMenu>
@@ -361,27 +368,27 @@ function ApiKeyRow({
 									) : (
 										<Ellipsis className="size-4 text-muted-foreground" />
 									)}
-									<span className="sr-only">API key actions</span>
+									<span className="sr-only">Actions de clé API</span>
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end">
 								<DropdownMenuItem onSelect={() => void handleToggleEnabled()}>
-									{apiKey.enabled ? "Deactivate key" : "Activate key"}
+									{apiKey.enabled ? "Désactiver la clé" : "Activer la clé"}
 								</DropdownMenuItem>
 								<DropdownMenuItem
 									onSelect={() => setDeleteDialogOpen(true)}
 									variant="destructive"
 								>
-									Delete key
+									Supprimer la clé
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
 					</div>
 					<div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
 						<span>
-							Created {createdDate}
+							Créée le {createdDate}
 							{apiKey.expiresAt
-								? ` · Expires ${new Date(apiKey.expiresAt).toLocaleDateString()}`
+								? ` · Expire le ${new Date(apiKey.expiresAt).toLocaleDateString()}`
 								: ""}
 						</span>
 						<span
@@ -391,7 +398,7 @@ function ApiKeyRow({
 									: "inline-flex items-center rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive"
 							}
 						>
-							{apiKey.enabled ? "Active" : "Disabled"}
+							{apiKey.enabled ? "Active" : "Désactivée"}
 						</span>
 					</div>
 				</div>
@@ -399,21 +406,22 @@ function ApiKeyRow({
 			<AlertDialog onOpenChange={setDeleteDialogOpen} open={deleteDialogOpen}>
 				<AlertDialogContent size="sm">
 					<AlertDialogHeader>
-						<AlertDialogTitle>Delete API key?</AlertDialogTitle>
+						<AlertDialogTitle>Supprimer la clé API ?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This removes{" "}
-							<span className="font-medium text-foreground">{label}</span>. Any
-							integration still using it will stop working immediately.
+							Cette action supprime{" "}
+							<span className="font-medium text-foreground">{label}</span>.
+							Toute intégration qui l’utilise cessera de fonctionner
+							immédiatement.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+						<AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
 						<AlertDialogAction
 							disabled={deleting}
 							onClick={() => void handleDelete()}
 							variant="destructive"
 						>
-							{deleting ? "Deleting..." : "Delete key"}
+							{deleting ? "Suppression..." : "Supprimer la clé"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -445,7 +453,9 @@ async function updateApiKeyEnabled({
 
 	if (!response.ok) {
 		throw new Error(
-			payload?.error?.message ?? payload?.message ?? "Failed to update API key",
+			payload?.error?.message ??
+				payload?.message ??
+				"Mise à jour de la clé API impossible",
 		);
 	}
 }

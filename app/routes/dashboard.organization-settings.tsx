@@ -45,8 +45,8 @@ export const Route = createFileRoute("/dashboard/organization-settings")({
 	staticData: {
 		dashboardHeader: {
 			description:
-				"Update the active organization profile and teammate access.",
-			title: "Organization settings",
+				"Modifier le profil de l’organisation active et les accès de l’équipe.",
+			title: "Paramètres de l’organisation",
 		},
 	},
 	component: OrganizationSettingsPage,
@@ -86,7 +86,9 @@ function OrganizationSettingsPage() {
 				query: { organizationId },
 			});
 			if (error) {
-				throw new Error(error.message ?? "Failed to load invitations");
+				throw new Error(
+					error.message ?? "Chargement des invitations impossible",
+				);
 			}
 			setOrganizationInvitations(
 				normalizeCollection<InvitationLike>(data)
@@ -95,7 +97,9 @@ function OrganizationSettingsPage() {
 			);
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to load invitations",
+				error instanceof Error
+					? error.message
+					: "Chargement des invitations impossible",
 			);
 		} finally {
 			setLoadingOrganizationInvitations(false);
@@ -145,12 +149,12 @@ function OrganizationSettingsPage() {
 				...currentDraft,
 				logo,
 			}));
-			toast.success("Organization picture updated");
+			toast.success("Image de l’organisation mise à jour");
 		} catch (error) {
 			toast.error(
 				error instanceof Error
 					? error.message
-					: "Failed to update organization picture",
+					: "Mise à jour de l’image impossible",
 			);
 		} finally {
 			setIsUploadingLogo(false);
@@ -163,7 +167,7 @@ function OrganizationSettingsPage() {
 			<Card className="border-border/70">
 				<CardContent className="p-6">
 					<p className="text-sm text-muted-foreground">
-						Loading organization settings...
+						Chargement des paramètres de l’organisation...
 					</p>
 				</CardContent>
 			</Card>
@@ -177,28 +181,32 @@ function OrganizationSettingsPage() {
 					<CardHeader className="gap-3 border-b border-border/70 bg-card/70">
 						<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
 							<Settings2 className="size-4" />
-							Organization settings
+							Paramètres de l’organisation
 						</div>
 						<div className="space-y-2">
-							<CardTitle className="text-3xl">No active organization</CardTitle>
+							<CardTitle className="text-3xl">
+								Aucune organisation active
+							</CardTitle>
 							<CardDescription className="max-w-2xl text-sm leading-6">
-								Create or switch to an organization from the sidebar before
-								managing organization settings.
+								Créez ou sélectionnez une organisation dans la barre latérale
+								avant de gérer ses paramètres.
 							</CardDescription>
 						</div>
 					</CardHeader>
 					<CardContent className="p-6">
 						<div className="flex flex-col gap-3 rounded-2xl border border-dashed border-border/70 bg-muted/30 p-6 sm:flex-row sm:items-center sm:justify-between">
 							<div className="space-y-1">
-								<p className="text-sm font-medium">Need a workspace first?</p>
+								<p className="text-sm font-medium">
+									Besoin d’un espace d’abord ?
+								</p>
 								<p className="text-sm text-muted-foreground">
-									Create one from the organization switcher at the top of the
-									sidebar.
+									Créez-en un depuis le sélecteur d’organisation en haut de la
+									barre latérale.
 								</p>
 							</div>
 							<Button asChild variant="outline">
 								<Link to="/dashboard">
-									Back to dashboard
+									Retour au tableau de bord
 									<ChevronRight className="size-4" />
 								</Link>
 							</Button>
@@ -215,15 +223,15 @@ function OrganizationSettingsPage() {
 				<CardHeader className="gap-3 border-b border-border/70 bg-card/70">
 					<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
 						<Settings2 className="size-4" />
-						Organization settings
+						Paramètres de l’organisation
 					</div>
 					<div className="space-y-2">
 						<CardTitle className="text-3xl">
 							{activeOrganization.name}
 						</CardTitle>
 						<CardDescription className="max-w-2xl text-sm leading-6">
-							Update the active organization profile and manage teammate
-							invitations from one place.
+							Modifiez le profil de l’organisation active et gérez les
+							invitations depuis le même écran.
 						</CardDescription>
 					</div>
 				</CardHeader>
@@ -253,16 +261,16 @@ function OrganizationSettingsPage() {
 									</Avatar>
 									<div className="space-y-1">
 										<p className="font-medium text-foreground">
-											Organization picture
+											Image de l’organisation
 										</p>
 										<p className="text-sm text-muted-foreground">
-											Upload a square image for the cleanest result. PNG, JPG,
-											or WebP up to 5 MB.
+											Importez une image carrée pour un meilleur rendu. PNG, JPG
+											ou WebP jusqu’à 5 Mo.
 										</p>
 									</div>
 								</div>
 								<Badge variant="outline">
-									Created {formatCreatedAt(activeOrganization.createdAt)}
+									Créée le {formatCreatedAt(activeOrganization.createdAt)}
 								</Badge>
 							</div>
 							<div className="flex flex-wrap gap-3">
@@ -283,10 +291,10 @@ function OrganizationSettingsPage() {
 									<Camera className="size-4" />
 									<span>
 										{isUploadingLogo
-											? "Uploading…"
+											? "Import…"
 											: draft.logo || activeOrganization.logo
-												? "Change photo"
-												: "Upload photo"}
+												? "Changer la photo"
+												: "Importer une photo"}
 									</span>
 								</Button>
 								<Button
@@ -301,14 +309,14 @@ function OrganizationSettingsPage() {
 									variant="ghost"
 								>
 									<Trash2 className="size-4" />
-									Remove image
+									Retirer l’image
 								</Button>
 							</div>
 						</div>
 						<FieldGroup>
 							<Field>
 								<FieldContent>
-									<FieldLabel htmlFor="organization-name">Name</FieldLabel>
+									<FieldLabel htmlFor="organization-name">Nom</FieldLabel>
 									<Input
 										disabled={isFormDisabled}
 										id="organization-name"
@@ -323,7 +331,8 @@ function OrganizationSettingsPage() {
 										value={draft.name}
 									/>
 									<FieldDescription>
-										Shown in the switcher and member-facing organization UI.
+										Affiché dans le sélecteur et les écrans visibles par les
+										membres.
 									</FieldDescription>
 								</FieldContent>
 							</Field>
@@ -345,7 +354,7 @@ function OrganizationSettingsPage() {
 										value={draft.slug}
 									/>
 									<FieldDescription>
-										Slug changes are optional but keep workspace URLs readable.
+										Le slug est optionnel, mais il garde des URL lisibles.
 									</FieldDescription>
 								</FieldContent>
 							</Field>
@@ -360,10 +369,12 @@ function OrganizationSettingsPage() {
 									type="button"
 									variant="outline"
 								>
-									Reset
+									Réinitialiser
 								</Button>
 								<Button disabled={isFormDisabled || !hasChanges} type="submit">
-									{isSaving ? "Saving..." : "Save organization"}
+									{isSaving
+										? "Enregistrement..."
+										: "Enregistrer l’organisation"}
 								</Button>
 							</div>
 						</div>
@@ -373,10 +384,9 @@ function OrganizationSettingsPage() {
 			<div className="space-y-6">
 				<Card className="border-border/70">
 					<CardHeader className="gap-2 border-b border-border/70 bg-card/70">
-						<CardTitle className="text-lg">Invite teammates</CardTitle>
+						<CardTitle className="text-lg">Inviter l’équipe</CardTitle>
 						<CardDescription>
-							Send organization invitations without leaving the current
-							workspace.
+							Envoyez des invitations sans quitter l’espace courant.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4 p-6">
@@ -408,7 +418,7 @@ function OrganizationSettingsPage() {
 								/>
 							</div>
 							<div className="space-y-2">
-								<Label htmlFor="invite-role">Role</Label>
+								<Label htmlFor="invite-role">Rôle</Label>
 								<select
 									className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
 									disabled={isInviting}
@@ -418,7 +428,7 @@ function OrganizationSettingsPage() {
 									}
 									value={inviteRole}
 								>
-									<option value="member">Member</option>
+									<option value="member">Membre</option>
 									<option value="admin">Admin</option>
 								</select>
 							</div>
@@ -432,7 +442,7 @@ function OrganizationSettingsPage() {
 								) : (
 									<MailPlus className="size-4" />
 								)}
-								{isInviting ? "Sending..." : "Send invitation"}
+								{isInviting ? "Envoi..." : "Envoyer l’invitation"}
 							</Button>
 						</form>
 						<Separator />
@@ -440,21 +450,21 @@ function OrganizationSettingsPage() {
 							<div className="flex items-center justify-between gap-3">
 								<div>
 									<p className="font-medium text-foreground">
-										Outstanding invitations
+										Invitations en attente
 									</p>
 									<p className="text-sm text-muted-foreground">
-										Track invited emails and resend by inviting the same address
-										again.
+										Suivez les emails invités. Pour relancer, invitez de nouveau
+										la même adresse.
 									</p>
 								</div>
 								<Badge variant="secondary">
 									{loadingOrganizationInvitations
-										? "Loading"
-										: `${organizationInvitations.length} total`}
+										? "Chargement"
+										: `${organizationInvitations.length} au total`}
 								</Badge>
 							</div>
 							{loadingOrganizationInvitations ? (
-								<LoadingState label="Loading invitations..." />
+								<LoadingState label="Chargement des invitations..." />
 							) : organizationInvitations.length ? (
 								<div className="space-y-3">
 									{organizationInvitations.map((invitation) => {
@@ -474,13 +484,16 @@ function OrganizationSettingsPage() {
 														</p>
 														<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
 															<Badge variant="outline">
-																{invitation.role ?? "member"}
+																{invitation.role === "admin"
+																	? "admin"
+																	: "membre"}
 															</Badge>
 															<Badge variant="secondary">
 																{invitation.status}
 															</Badge>
 															<span>
-																Expires {formatCreatedAt(invitation.expiresAt)}
+																Expire le{" "}
+																{formatCreatedAt(invitation.expiresAt)}
 															</span>
 														</div>
 													</div>
@@ -505,7 +518,7 @@ function OrganizationSettingsPage() {
 															) : (
 																<X className="size-4" />
 															)}
-															Cancel
+															Annuler
 														</Button>
 													) : null}
 												</div>
@@ -515,8 +528,8 @@ function OrganizationSettingsPage() {
 								</div>
 							) : (
 								<EmptyState
-									description="Invite collaborators from this page when you are ready to share access."
-									title="No pending invitations"
+									description="Invitez des collaborateurs depuis cette page quand l’accès doit être partagé."
+									title="Aucune invitation en attente"
 								/>
 							)}
 						</div>
@@ -631,14 +644,18 @@ async function handleSaveOrganization(
 		});
 
 		if (error) {
-			throw new Error(error.message ?? "Failed to update organization");
+			throw new Error(
+				error.message ?? "Mise à jour de l’organisation impossible",
+			);
 		}
 
 		await onSaved();
-		toast.success("Organization updated");
+		toast.success("Organisation mise à jour");
 	} catch (error) {
 		toast.error(
-			error instanceof Error ? error.message : "Failed to update organization",
+			error instanceof Error
+				? error.message
+				: "Mise à jour de l’organisation impossible",
 		);
 	} finally {
 		setIsSaving(false);
@@ -672,14 +689,16 @@ async function handleInviteMember(
 			role: inviteRole,
 		});
 		if (error) {
-			throw new Error(error.message ?? "Failed to send invitation");
+			throw new Error(error.message ?? "Envoi de l’invitation impossible");
 		}
 
 		await onInvited();
-		toast.success("Invitation sent");
+		toast.success("Invitation envoyée");
 	} catch (error) {
 		toast.error(
-			error instanceof Error ? error.message : "Failed to send invitation",
+			error instanceof Error
+				? error.message
+				: "Envoi de l’invitation impossible",
 		);
 	} finally {
 		setIsInviting(false);
@@ -707,7 +726,7 @@ async function handleCancelInvitation(
 			invitationId,
 		});
 		if (error) {
-			throw new Error(error.message ?? "Failed to cancel invitation");
+			throw new Error(error.message ?? "Annulation de l’invitation impossible");
 		}
 		setOrganizationInvitations((currentInvitations) =>
 			currentInvitations.filter(
@@ -715,10 +734,12 @@ async function handleCancelInvitation(
 			),
 		);
 		await onCompleted();
-		toast.success("Invitation cancelled");
+		toast.success("Invitation annulée");
 	} catch (error) {
 		toast.error(
-			error instanceof Error ? error.message : "Failed to cancel invitation",
+			error instanceof Error
+				? error.message
+				: "Annulation de l’invitation impossible",
 		);
 	} finally {
 		setProcessingInvitationId(null);
@@ -769,10 +790,10 @@ function normalizeOptionalString(value: string) {
 
 function formatCreatedAt(createdAt: Date | string | number | null | undefined) {
 	if (!createdAt) {
-		return "Unknown";
+		return "Inconnu";
 	}
 
-	return new Intl.DateTimeFormat("en", {
+	return new Intl.DateTimeFormat("fr-FR", {
 		dateStyle: "long",
 	}).format(new Date(createdAt));
 }
@@ -792,11 +813,11 @@ function getInitials(value: string | undefined) {
 
 function validateOrganizationLogoFile(file: File) {
 	if (!file.type.startsWith("image/")) {
-		return "Choose an image file";
+		return "Choisissez un fichier image";
 	}
 
 	if (file.size > 5 * 1024 * 1024) {
-		return "Organization images must be 5 MB or smaller";
+		return "Les images d’organisation doivent faire 5 Mo maximum";
 	}
 
 	return null;
@@ -827,7 +848,9 @@ async function convertImageFileToDataUrl(file: File) {
 
 	const context = canvas.getContext("2d");
 	if (!context) {
-		throw new Error("Image processing is unavailable in this browser");
+		throw new Error(
+			"Le traitement d’image n’est pas disponible dans ce navigateur",
+		);
 	}
 
 	context.drawImage(image, 0, 0, width, height);
@@ -841,7 +864,7 @@ async function convertImageFileToDataUrl(file: File) {
 	}
 
 	if (lastDataUrl.length > 900_000) {
-		throw new Error("Choose a smaller image");
+		throw new Error("Choisissez une image plus légère");
 	}
 
 	return lastDataUrl;
@@ -854,7 +877,7 @@ async function loadImageFromFile(file: File) {
 		return await new Promise<HTMLImageElement>((resolve, reject) => {
 			const image = new Image();
 			image.onload = () => resolve(image);
-			image.onerror = () => reject(new Error("Failed to read image"));
+			image.onerror = () => reject(new Error("Lecture de l’image impossible"));
 			image.src = objectUrl;
 		});
 	} finally {

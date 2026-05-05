@@ -45,7 +45,7 @@ export function CreateOrganizationDialog({
 		setCreating(false);
 
 		if (createError) {
-			setError(createError.message ?? "Failed to create organization");
+			setError(createError.message ?? "Création de l’organisation impossible");
 			return;
 		}
 
@@ -67,16 +67,16 @@ export function CreateOrganizationDialog({
 			<DialogContent className="max-w-xl rounded-3xl border-border/70 p-0 sm:max-w-xl">
 				<form onSubmit={handleCreate}>
 					<DialogHeader className="border-b border-border/70 px-6 py-6">
-						<DialogTitle>Create organization</DialogTitle>
+						<DialogTitle>Créer une organisation</DialogTitle>
 						<DialogDescription className="max-w-md text-sm leading-6">
-							Create a workspace for a team, client, or business unit. The slug
-							becomes the URL-friendly identifier.
+							Créez un espace pour une équipe, un client ou une entité. Le slug
+							sert d’identifiant compatible URL.
 						</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-5 px-6 py-6">
 						<div className="grid gap-4 sm:grid-cols-2">
 							<div className="space-y-2">
-								<Label htmlFor="organization-name">Name</Label>
+								<Label htmlFor="organization-name">Nom</Label>
 								<Input
 									autoFocus
 									id="organization-name"
@@ -110,7 +110,7 @@ export function CreateOrganizationDialog({
 							) : (
 								<Plus className="size-4" />
 							)}
-							{creating ? "Creating..." : "Create organization"}
+							{creating ? "Création..." : "Créer une organisation"}
 						</Button>
 					</DialogFooter>
 				</form>

@@ -10,6 +10,11 @@ function getBrowserApiBaseUrl(): string {
 
 export function createBrowserApiClient(): AppApiClient {
 	const link = new OpenAPILink(apiContract, {
+		fetch: (request, init) =>
+			fetch(request, {
+				...init,
+				credentials: "same-origin",
+			}),
 		url: () => getBrowserApiBaseUrl(),
 	});
 

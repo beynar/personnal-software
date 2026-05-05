@@ -12,6 +12,7 @@ function createRouter() {
 			getOrpc: () => getDefaultApiClient(),
 		} satisfies AppRouterContext,
 		defaultPreload: "intent",
+		defaultViewTransition: true,
 		scrollRestoration: true,
 	});
 }

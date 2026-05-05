@@ -13,14 +13,16 @@ import {
 	BookOpen,
 	Building2,
 	Copy,
+	FileSpreadsheet,
 	Home,
 	Key,
-	Layers3,
 	LogOut,
 	Mail,
 	Moon,
+	Plus,
 	Sun,
 	UserRound,
+	Warehouse,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -52,6 +54,11 @@ import {
 } from "~/components/ui/sidebar";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { authClient } from "~/lib/auth-client";
 import { getBetterAuthSessionStatus } from "~/lib/auth.functions";
 import { getDashboardPageHeader } from "~/lib/dashboard-page-header";
@@ -61,8 +68,14 @@ import { cn } from "~/lib/utils";
 import { api } from "../../convex/_generated/api";
 
 const dashboardLinks = [
-	{ to: "/dashboard", label: "Overview", icon: Home },
-	{ to: "/dashboard/design-system", label: "Design System", icon: Layers3 },
+	{ to: "/dashboard", label: "Tableau de bord", icon: Home },
+	{ to: "/dashboard/products", label: "Produits", icon: Warehouse },
+	{ to: "/dashboard/declaration", label: "Déclaration", icon: FileSpreadsheet },
+	{
+		to: "/dashboard/reference",
+		label: "Référence éco-participation",
+		icon: BookOpen,
+	},
 ] as const;
 
 export const Route = createFileRoute("/dashboard")({
@@ -74,8 +87,8 @@ export const Route = createFileRoute("/dashboard")({
 	},
 	staticData: {
 		dashboardHeader: {
-			description: "Starter workspace with a persistent shell and nested pages",
-			title: "Dashboard",
+			description: "Espace éco-participation Molteni&C France",
+			title: "Tableau de bord",
 		},
 	},
 	component: DashboardLayoutRoute,
@@ -88,10 +101,12 @@ function DashboardLayoutRoute() {
 function DashboardShell() {
 	const user = useQuery(api.users.viewer);
 	const syncViewerProfile = useMutation(api.users.syncViewerProfile);
+	const ensureSeedData = useMutation(api.products.ensureSeedData);
 	const pageHeader = getDashboardPageHeader(useMatches());
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 	const [theme, setTheme] = useState<"light" | "dark">("light");
+	const [hasSeededMolteniData, setHasSeededMolteniData] = useState(false);
 	const { data: activeOrganization, isPending: loadingActiveOrganization } =
 		authClient.useActiveOrganization();
 	const { data: organizations, isPending: loadingOrganizations } =
@@ -130,13 +145,26 @@ function DashboardShell() {
 	}, [syncViewerProfile, user?._id]);
 
 	useEffect(() => {
+		if (!user?._id || hasSeededMolteniData) return;
+		setHasSeededMolteniData(true);
+		ensureSeedData().catch((error) => {
+			setHasSeededMolteniData(false);
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Initialisation du barème impossible",
+			);
+		});
+	}, [ensureSeedData, hasSeededMolteniData, user?._id]);
+
+	useEffect(() => {
 		const root = document.documentElement;
 		setTheme(root.classList.contains("dark") ? "dark" : "light");
 	}, []);
 
 	async function handleSignOut() {
 		await authClient.signOut();
-		navigate({ to: "/" });
+		navigate({ to: "/", viewTransition: true });
 	}
 
 	async function handleCopyMcpUrl() {
@@ -144,10 +172,12 @@ function DashboardShell() {
 
 		try {
 			await navigator.clipboard.writeText(mcpUrl);
-			toast.success("MCP URL copied");
+			toast.success("URL MCP copiée");
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to copy MCP URL",
+				error instanceof Error
+					? error.message
+					: "Copie de l’URL MCP impossible",
 			);
 		}
 	}
@@ -167,17 +197,11 @@ function DashboardShell() {
 				<SidebarContent>
 					<SidebarMenu>
 						{dashboardLinks.map((link) => (
-							<SidebarMenuItem key={link.to}>
-								<SidebarMenuButton
-									asChild
-									isActive={isActiveLink(pathname, link.to)}
-								>
-									<Link to={link.to}>
-										<link.icon className="size-4 shrink-0" />
-										<SidebarLabel>{link.label}</SidebarLabel>
-									</Link>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
+							<DashboardSidebarLink
+								isActive={isActiveLink(pathname, link.to)}
+								key={link.to}
+								link={link}
+							/>
 						))}
 					</SidebarMenu>
 				</SidebarContent>
@@ -192,32 +216,89 @@ function DashboardShell() {
 			<SidebarInset>
 				<header className="sticky top-0 z-10 h-14 border-b border-border/70 bg-background/95 backdrop-blur">
 					<div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6">
-						<div className="flex items-center gap-3">
+						<div className="flex items-center gap-2">
 							<SidebarTrigger />
 							{pageHeader?.backHref ? (
 								<Button asChild size="icon-sm" type="button" variant="ghost">
-									<Link to={pageHeader.backHref}>
+									<Link to={pageHeader.backHref} viewTransition>
 										<ArrowLeft className="size-4" />
-										<span className="sr-only">Go back</span>
+										<span className="sr-only">Retour</span>
 									</Link>
 								</Button>
 							) : null}
-							<div className="min-w-0">
-								<p className="text-sm font-medium text-foreground">
+							<div className="min-w-0 leading-tight">
+								<p className="font-medium text-[0.8125rem] text-foreground leading-tight">
 									{pageHeader?.title}
 								</p>
-								<p className="truncate text-sm text-muted-foreground">
+								<p className="truncate text-[0.6875rem] text-muted-foreground leading-tight">
 									{pageHeader?.description}
 								</p>
 							</div>
 						</div>
+						<div
+							className="flex shrink-0 items-center gap-2"
+							id="dashboard-header-actions"
+						>
+							<DashboardHeaderActions pathname={pathname} />
+						</div>
 					</div>
 				</header>
-				<div className="flex flex-1 flex-col px-4 py-6 sm:px-6">
+				<div className="flex flex-1 flex-col px-4 py-6 [view-transition-name:dashboard-content] sm:px-6">
 					<Outlet />
 				</div>
 			</SidebarInset>
 		</SidebarProvider>
+	);
+}
+
+function DashboardSidebarLink({
+	isActive,
+	link,
+}: {
+	isActive: boolean;
+	link: (typeof dashboardLinks)[number];
+}) {
+	const { isCollapsed, isMobile } = useSidebar();
+	const button = (
+		<SidebarMenuButton asChild isActive={isActive}>
+			<Link to={link.to} viewTransition>
+				<link.icon className="size-4 shrink-0" />
+				<SidebarLabel>{link.label}</SidebarLabel>
+			</Link>
+		</SidebarMenuButton>
+	);
+
+	return (
+		<SidebarMenuItem>
+			{isCollapsed && !isMobile ? (
+				<Tooltip>
+					<TooltipTrigger asChild>{button}</TooltipTrigger>
+					<TooltipContent side="right" sideOffset={10}>
+						{link.label}
+					</TooltipContent>
+				</Tooltip>
+			) : (
+				button
+			)}
+		</SidebarMenuItem>
+	);
+}
+
+function DashboardHeaderActions({ pathname }: { pathname: string }) {
+	if (
+		!pathname.startsWith("/dashboard/products") ||
+		pathname === "/dashboard/products/new"
+	) {
+		return null;
+	}
+
+	return (
+		<Button asChild>
+			<Link to="/dashboard/products/new" viewTransition>
+				<Plus className="size-4" />
+				Ajouter un produit
+			</Link>
+		</Button>
 	);
 }
 
@@ -255,7 +336,7 @@ function SessionFooter({
 		return <SessionFooterSkeleton className={className} />;
 	}
 
-	const userLabel = user?.name ?? user?.email ?? "Signed in";
+	const userLabel = user?.name ?? user?.email ?? "Connecté";
 
 	return (
 		<>
@@ -286,7 +367,7 @@ function SessionFooter({
 										{userLabel}
 									</p>
 									<p className="truncate text-[11px] leading-tight text-muted-foreground">
-										{user?.email ?? "Account"}
+										{user?.email ?? "Compte"}
 									</p>
 								</div>
 							</div>
@@ -299,7 +380,7 @@ function SessionFooter({
 						side="right"
 						sideOffset={10}
 					>
-						<AccountMenuItems
+						<CompteMenuItems
 							activeOrganization={activeOrganization}
 							onCopyMcpUrl={onCopyMcpUrl}
 							onOpenApiKeys={() => setApiKeyDrawerOpen(true)}
@@ -315,7 +396,7 @@ function SessionFooter({
 	);
 }
 
-function AccountMenuItems({
+function CompteMenuItems({
 	activeOrganization,
 	onCopyMcpUrl,
 	onOpenApiKeys,
@@ -333,39 +414,39 @@ function AccountMenuItems({
 			<DropdownMenuItem asChild>
 				<a href="/api/v1/docs">
 					<BookOpen className="size-4" />
-					<span>API reference</span>
+					<span>Référence API</span>
 				</a>
 			</DropdownMenuItem>
 			<DropdownMenuItem onSelect={onOpenApiKeys}>
 				<Key className="size-4" />
-				<span>API keys</span>
+				<span>Clés API</span>
 			</DropdownMenuItem>
 			<DropdownMenuItem onSelect={onOpenPendingInvitations}>
 				<Mail className="size-4" />
-				<span>Pending invites</span>
+				<span>Invitations</span>
 			</DropdownMenuItem>
 			<DropdownMenuItem onSelect={() => void onCopyMcpUrl()}>
 				<Copy className="size-4" />
-				<span>Copy MCP URL</span>
+				<span>Copier l’URL MCP</span>
 			</DropdownMenuItem>
 			{activeOrganization ? (
 				<DropdownMenuItem asChild>
 					<Link to="/dashboard/organization-settings">
 						<Building2 className="size-4" />
-						<span>Organization settings</span>
+						<span>Paramètres de l’organisation</span>
 					</Link>
 				</DropdownMenuItem>
 			) : null}
 			<DropdownMenuItem asChild>
 				<Link to="/dashboard/profile">
 					<UserRound className="size-4" />
-					<span>Profile</span>
+					<span>Profil</span>
 				</Link>
 			</DropdownMenuItem>
 			<DropdownMenuSeparator />
 			<DropdownMenuItem onSelect={() => void onSignOut()} variant="destructive">
 				<LogOut className="size-4" />
-				<span>Sign out</span>
+				<span>Déconnexion</span>
 			</DropdownMenuItem>
 		</>
 	);
@@ -420,7 +501,7 @@ function DashboardSidebarFooter({
 	const [apiKeyDrawerOpen, setApiKeyDrawerOpen] = useState(false);
 	const [pendingInvitationsDrawerOpen, setPendingInvitationsDrawerOpen] =
 		useState(false);
-	const userLabel = user?.name ?? user?.email ?? "Signed in";
+	const userLabel = user?.name ?? user?.email ?? "Connecté";
 
 	if (isCollapsed && !isMobile) {
 		if (user === undefined) {
@@ -470,26 +551,36 @@ function DashboardSidebarFooter({
 					variant="ghost"
 				/>
 				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button
-							className="m-0 h-14 w-full rounded-none border-0"
-							size="icon"
-							variant="ghost"
-						>
-							<Avatar className="size-8 border border-border/70" size="lg">
-								<AvatarImage alt={userLabel} src={user?.image ?? undefined} />
-								<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
-							</Avatar>
-							<span className="sr-only">Open account menu</span>
-						</Button>
-					</DropdownMenuTrigger>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<DropdownMenuTrigger asChild>
+								<Button
+									className="m-0 h-14 w-full rounded-none border-0"
+									size="icon"
+									variant="ghost"
+								>
+									<Avatar className="size-8 border border-border/70" size="lg">
+										<AvatarImage
+											alt={userLabel}
+											src={user?.image ?? undefined}
+										/>
+										<AvatarFallback>{getInitials(userLabel)}</AvatarFallback>
+									</Avatar>
+									<span className="sr-only">Ouvrir le menu du compte</span>
+								</Button>
+							</DropdownMenuTrigger>
+						</TooltipTrigger>
+						<TooltipContent side="right" sideOffset={10}>
+							Menu du compte
+						</TooltipContent>
+					</Tooltip>
 					<DropdownMenuContent
 						align="start"
 						collisionPadding={12}
 						side="right"
 						sideOffset={10}
 					>
-						<AccountMenuItems
+						<CompteMenuItems
 							activeOrganization={activeOrganization}
 							onCopyMcpUrl={onCopyMcpUrl}
 							onOpenApiKeys={() => setApiKeyDrawerOpen(true)}
@@ -548,7 +639,7 @@ function ThemeToggle({
 	}
 
 	const Icon = theme === "dark" ? Sun : Moon;
-	const label = theme === "dark" ? "Light mode" : "Dark mode";
+	const label = theme === "dark" ? "Mode clair" : "Mode sombre";
 
 	if (compact) {
 		return (
@@ -578,7 +669,7 @@ function ThemeToggle({
 						<Icon className="size-4" />
 					</div>
 					<div className="min-w-0" id="theme-toggle-label">
-						<p className="text-sm font-medium">Dark mode</p>
+						<p className="text-sm font-medium">Mode sombre</p>
 					</div>
 				</div>
 				<Switch
@@ -592,7 +683,7 @@ function ThemeToggle({
 		);
 	}
 
-	return (
+	const collapsedButton = (
 		<Button
 			className={className}
 			onClick={toggleTheme}
@@ -607,12 +698,29 @@ function ThemeToggle({
 			)}
 		</Button>
 	);
+
+	if (isCollapsed && !isMobile) {
+		return (
+			<Tooltip>
+				<TooltipTrigger asChild>{collapsedButton}</TooltipTrigger>
+				<TooltipContent side="right" sideOffset={10}>
+					{label}
+				</TooltipContent>
+			</Tooltip>
+		);
+	}
+
+	return collapsedButton;
 }
 
 function SidebarLabel({ children }: { children: React.ReactNode }) {
 	const { isCollapsed, isMobile } = useSidebar();
 
-	return isCollapsed && !isMobile ? null : <span>{children}</span>;
+	return isCollapsed && !isMobile ? null : (
+		<span className="whitespace-nowrap font-sans text-[0.8125rem] leading-tight">
+			{children}
+		</span>
+	);
 }
 
 function getInitials(value: string | undefined) {

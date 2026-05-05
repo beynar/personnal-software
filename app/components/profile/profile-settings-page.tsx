@@ -78,10 +78,12 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 
 		try {
 			await updateProfile(draft);
-			toast.success("Profile updated");
+			toast.success("Profil mis à jour");
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to update profile",
+				error instanceof Error
+					? error.message
+					: "Impossible de mettre à jour le profil",
 			);
 		} finally {
 			setIsSaving(false);
@@ -95,13 +97,13 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 		}
 
 		if (!file.type.startsWith("image/")) {
-			toast.error("Choose an image file");
+			toast.error("Choisissez un fichier image");
 			event.target.value = "";
 			return;
 		}
 
 		if (file.size > 5 * 1024 * 1024) {
-			toast.error("Profile images must be 5 MB or smaller");
+			toast.error("La photo doit faire 5 Mo maximum");
 			event.target.value = "";
 			return;
 		}
@@ -117,23 +119,23 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 			});
 
 			if (!response.ok) {
-				throw new Error("Upload failed");
+				throw new Error("Import impossible");
 			}
 
 			const { storageId } = (await response.json()) as {
 				storageId?: Id<"_storage">;
 			};
 			if (!storageId) {
-				throw new Error("Upload failed");
+				throw new Error("Import impossible");
 			}
 
 			await updateProfileImage({ storageId });
-			toast.success("Profile picture updated");
+			toast.success("Photo de profil mise à jour");
 		} catch (error) {
 			toast.error(
 				error instanceof Error
 					? error.message
-					: "Failed to update profile picture",
+					: "Impossible de mettre à jour la photo de profil",
 			);
 		} finally {
 			setIsUploadingImage(false);
@@ -146,12 +148,12 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 
 		try {
 			await updateProfileImage({ storageId: null });
-			toast.success("Profile picture removed");
+			toast.success("Photo de profil retirée");
 		} catch (error) {
 			toast.error(
 				error instanceof Error
 					? error.message
-					: "Failed to remove profile picture",
+					: "Impossible de retirer la photo de profil",
 			);
 		} finally {
 			setIsUploadingImage(false);
@@ -163,15 +165,12 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 			<Card className="border-border/70">
 				<CardHeader className="gap-3 border-b border-border/70 bg-card/70">
 					<div>
-						<p className="text-sm font-medium text-muted-foreground">Profile</p>
-						<CardTitle className="mt-2 text-3xl">
-							Public identity scaffold
-						</CardTitle>
+						<p className="text-sm font-medium text-muted-foreground">Profil</p>
+						<CardTitle className="mt-2 text-3xl">Identité du compte</CardTitle>
 					</div>
 					<CardDescription className="max-w-2xl text-sm leading-6">
-						This starter page gives authenticated users a place to manage the
-						basics that usually feed an avatar menu, author byline, or member
-						directory.
+						Gérez les informations affichées dans le menu utilisateur et les
+						vues d’équipe.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="p-6">
@@ -180,7 +179,7 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 							<div className="flex items-center gap-4">
 								<Avatar className="size-20 border border-border/70" size="lg">
 									<AvatarImage
-										alt={draft.name.trim() || user?.email || "Profile picture"}
+										alt={draft.name.trim() || user?.email || "Photo de profil"}
 										src={user?.image ?? undefined}
 									/>
 									<AvatarFallback>
@@ -188,10 +187,10 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 									</AvatarFallback>
 								</Avatar>
 								<div className="space-y-1">
-									<p className="font-medium text-foreground">Profile picture</p>
+									<p className="font-medium text-foreground">Photo de profil</p>
 									<p className="text-sm text-muted-foreground">
-										Upload a square image for the cleanest result. PNG, JPG, or
-										WebP up to 5 MB.
+										Importez une image carrée pour un rendu net. PNG, JPG ou
+										WebP, 5 Mo maximum.
 									</p>
 								</div>
 							</div>
@@ -213,10 +212,10 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 									<Camera className="size-4" />
 									<span>
 										{isUploadingImage
-											? "Uploading…"
+											? "Import…"
 											: user?.image
-												? "Change photo"
-												: "Upload photo"}
+												? "Changer la photo"
+												: "Importer une photo"}
 									</span>
 								</Button>
 								<Button
@@ -226,14 +225,14 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 									variant="ghost"
 								>
 									<Trash2 className="size-4" />
-									<span>Remove</span>
+									<span>Retirer</span>
 								</Button>
 							</div>
 						</div>
 						<FieldGroup>
 							<Field>
 								<FieldContent>
-									<FieldLabel htmlFor="profile-name">Name</FieldLabel>
+									<FieldLabel htmlFor="profile-name">Nom</FieldLabel>
 									<Input
 										autoComplete="name"
 										disabled={isDisabled}
@@ -245,17 +244,19 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 												name: event.target.value,
 											}))
 										}
-										placeholder="A readable display name"
+										placeholder="Nom affiché"
 										value={draft.name}
 									/>
 									<FieldDescription>
-										Shown anywhere the app needs a human-readable name.
+										Utilisé quand l’app affiche une personne plutôt qu’un email.
 									</FieldDescription>
 								</FieldContent>
 							</Field>
 							<Field>
 								<FieldContent>
-									<FieldLabel htmlFor="profile-username">Username</FieldLabel>
+									<FieldLabel htmlFor="profile-username">
+										Identifiant
+									</FieldLabel>
 									<Input
 										autoCapitalize="none"
 										autoComplete="username"
@@ -268,18 +269,18 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 												username: event.target.value,
 											}))
 										}
-										placeholder="handle"
+										placeholder="identifiant"
 										value={draft.username}
 									/>
 									<FieldDescription>
-										Lowercased on save. Use letters, numbers, hyphens, or
-										underscores.
+										Enregistré en minuscules. Lettres, chiffres, tirets et
+										underscores acceptés.
 									</FieldDescription>
 								</FieldContent>
 							</Field>
 							<Field>
 								<FieldContent>
-									<FieldLabel htmlFor="profile-bio">Bio</FieldLabel>
+									<FieldLabel htmlFor="profile-bio">Présentation</FieldLabel>
 									<Textarea
 										disabled={isDisabled}
 										id="profile-bio"
@@ -290,14 +291,14 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 												bio: event.target.value,
 											}))
 										}
-										placeholder="A short summary about the person behind this account."
+										placeholder="Courte description de la personne derrière ce compte."
 										rows={5}
 										value={draft.bio}
 									/>
 									<div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
 										<FieldDescription>
-											Keep it short. This is the copy most templates surface
-											near an avatar or profile header.
+											Restez bref. Ce texte peut apparaître près d’un avatar ou
+											d’un en-tête de profil.
 										</FieldDescription>
 										<span>{draft.bio.length}/280</span>
 									</div>
@@ -306,7 +307,7 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 						</FieldGroup>
 						<div className="flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
 							<p className="text-sm text-muted-foreground">
-								{user?.email ?? "Signed in account"}
+								{user?.email ?? "Compte connecté"}
 							</p>
 							<div className="flex gap-3">
 								<Button
@@ -315,10 +316,10 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 									type="button"
 									variant="outline"
 								>
-									Reset
+									Réinitialiser
 								</Button>
 								<Button disabled={isDisabled || !hasChanges} type="submit">
-									{isSaving ? "Saving…" : "Save profile"}
+									{isSaving ? "Enregistrement…" : "Enregistrer le profil"}
 								</Button>
 							</div>
 						</div>
@@ -328,15 +329,15 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 			<div>
 				<Card className="border-border/70">
 					<CardHeader>
-						<CardTitle>Preview</CardTitle>
+						<CardTitle>Aperçu</CardTitle>
 						<CardDescription>
-							A minimal snapshot of how this data reads in product UI.
+							Vérifiez comment ces informations apparaîtront dans l’interface.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
 						<Avatar className="size-16 border border-border/70" size="lg">
 							<AvatarImage
-								alt={draft.name.trim() || user?.email || "Profile picture"}
+								alt={draft.name.trim() || user?.email || "Photo de profil"}
 								src={user?.image ?? undefined}
 							/>
 							<AvatarFallback>
@@ -345,7 +346,7 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 						</Avatar>
 						<div className="space-y-1">
 							<p className="text-lg font-semibold text-foreground">
-								{draft.name.trim() || "Unnamed user"}
+								{draft.name.trim() || "Utilisateur sans nom"}
 							</p>
 							<p className="text-sm text-muted-foreground">
 								{draft.username.trim()
@@ -355,7 +356,7 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 						</div>
 						<p className="text-sm leading-6 text-muted-foreground">
 							{draft.bio.trim() ||
-								"A short bio helps the rest of the template feel less anonymous."}
+								"Une courte bio rend le profil moins anonyme."}
 						</p>
 					</CardContent>
 				</Card>

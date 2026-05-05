@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getToken } from "~/lib/auth-server";
+import { getRequest } from "@tanstack/react-start/server";
+import { resolveAuthSession } from "~/lib/api-auth";
 
 export type BetterAuthSessionStatus =
 	| "anonymous"
@@ -13,8 +14,8 @@ export type BetterAuthSessionStatus =
  */
 async function resolveBetterAuthSessionStatus(): Promise<BetterAuthSessionStatus> {
 	try {
-		const token = await getToken();
-		return token ? "authenticated" : "anonymous";
+		const session = await resolveAuthSession(getRequest().headers);
+		return session ? "authenticated" : "anonymous";
 	} catch (err) {
 		console.error("[auth-session] Better Auth session check unavailable:", err);
 		return "unavailable";

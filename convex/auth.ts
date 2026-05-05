@@ -17,12 +17,15 @@ import betterAuthSchema from "./betterAuth/schema";
 
 const siteUrl = process.env.SITE_URL ?? "http://localhost:8888";
 const trustedOrigins = (() => {
-	const origins = [siteUrl];
+	const origins = [siteUrl, "http://localhost:*", "http://127.0.0.1:*"];
 
 	try {
-		const { hostname } = new URL(siteUrl);
-		if (hostname === "localhost" || hostname === "127.0.0.1") {
-			origins.push("http://localhost:*", "http://127.0.0.1:*");
+		const configuredOrigins = process.env.TRUSTED_ORIGINS?.split(",") ?? [];
+		for (const origin of configuredOrigins) {
+			const trimmedOrigin = origin.trim();
+			if (trimmedOrigin) {
+				origins.push(trimmedOrigin);
+			}
 		}
 	} catch {}
 

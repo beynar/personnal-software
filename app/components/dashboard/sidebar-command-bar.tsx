@@ -4,7 +4,6 @@ import {
 	Command,
 	Copy,
 	Home,
-	Layers3,
 	LogOut,
 	Moon,
 	Sun,
@@ -23,6 +22,11 @@ import {
 	CommandShortcut,
 } from "~/components/ui/command";
 import { useSidebar } from "~/components/ui/sidebar";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { authClient } from "~/lib/auth-client";
 
 type DashboardSidebarCommandBarProps = {
@@ -74,16 +78,23 @@ export function DashboardSidebarCommandBar({
 	if (isCollapsed && !isMobile) {
 		return (
 			<>
-				<Button
-					className="m-0 h-14 w-full rounded-none border-b border-border/70"
-					onClick={() => setOpen(true)}
-					size="icon"
-					type="button"
-					variant="ghost"
-				>
-					<Command className="size-4" />
-					<span className="sr-only">Search commands</span>
-				</Button>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							className="m-0 h-14 w-full rounded-none border-b border-border/70"
+							onClick={() => setOpen(true)}
+							size="icon"
+							type="button"
+							variant="ghost"
+						>
+							<Command className="size-4" />
+							<span className="sr-only">Rechercher une commande</span>
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent side="right" sideOffset={10}>
+						Rechercher
+					</TooltipContent>
+				</Tooltip>
 				<DashboardCommandDialog
 					activeOrganization={activeOrganization}
 					onCopyMcpUrl={onCopyMcpUrl}
@@ -107,7 +118,7 @@ export function DashboardSidebarCommandBar({
 			>
 				<span className="flex items-center gap-2">
 					<Command className="size-4" />
-					<span className="text-sm">Search commands</span>
+					<span className="text-sm">Rechercher</span>
 				</span>
 				<CommandShortcut className="ml-2.5 inline-flex">⌘K</CommandShortcut>
 			</Button>
@@ -145,51 +156,45 @@ function DashboardCommandDialog({
 
 	return (
 		<CommandDialog
-			description="Search navigation and workspace actions."
+			description="Rechercher une page ou une action."
 			onOpenChange={onOpenChange}
 			open={open}
-			title="Dashboard commands"
+			title="Commandes"
 		>
-			<CommandInput placeholder="Search commands..." />
+			<CommandInput placeholder="Rechercher..." />
 			<CommandList>
-				<CommandEmpty>No results found.</CommandEmpty>
+				<CommandEmpty>Aucun résultat.</CommandEmpty>
 				<CommandGroup heading="Navigation">
 					<CommandItem
 						onSelect={() => {
 							onOpenChange(false);
-							void navigate({ to: "/dashboard" });
+							void navigate({ to: "/dashboard", viewTransition: true });
 						}}
 					>
 						<Home className="size-4" />
-						Overview
+						Tableau de bord
 					</CommandItem>
 					<CommandItem
 						onSelect={() => {
 							onOpenChange(false);
-							void navigate({ to: "/dashboard/design-system" });
-						}}
-					>
-						<Layers3 className="size-4" />
-						Design System
-					</CommandItem>
-					<CommandItem
-						onSelect={() => {
-							onOpenChange(false);
-							void navigate({ to: "/dashboard/profile" });
+							void navigate({ to: "/dashboard/profile", viewTransition: true });
 						}}
 					>
 						<UserRound className="size-4" />
-						Profile
+						Profil
 					</CommandItem>
 					{activeOrganization ? (
 						<CommandItem
 							onSelect={() => {
 								onOpenChange(false);
-								void navigate({ to: "/dashboard/organization-settings" });
+								void navigate({
+									to: "/dashboard/organization-settings",
+									viewTransition: true,
+								});
 							}}
 						>
 							<Building2 className="size-4" />
-							Organization settings
+							Paramètres de l’organisation
 						</CommandItem>
 					) : null}
 				</CommandGroup>
@@ -203,7 +208,7 @@ function DashboardCommandDialog({
 							}}
 						>
 							<Sun className="size-4" />
-							Light mode
+							Mode clair
 						</CommandItem>
 					) : (
 						<CommandItem
@@ -213,7 +218,7 @@ function DashboardCommandDialog({
 							}}
 						>
 							<Moon className="size-4" />
-							Dark mode
+							Mode sombre
 						</CommandItem>
 					)}
 					<CommandItem
@@ -223,7 +228,7 @@ function DashboardCommandDialog({
 						}}
 					>
 						<Copy className="size-4" />
-						Copy MCP URL
+						Copier l’URL MCP
 					</CommandItem>
 					<CommandItem
 						onSelect={() => {
@@ -232,7 +237,7 @@ function DashboardCommandDialog({
 						}}
 					>
 						<LogOut className="size-4" />
-						Sign out
+						Déconnexion
 					</CommandItem>
 				</CommandGroup>
 			</CommandList>

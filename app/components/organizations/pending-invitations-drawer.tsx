@@ -69,7 +69,7 @@ export function PendingInvitationsDrawer({
 			setError(
 				error instanceof Error
 					? error.message
-					: "Failed to load pending invitations",
+					: "Chargement des invitations impossible",
 			);
 		} finally {
 			setLoading(false);
@@ -87,7 +87,7 @@ export function PendingInvitationsDrawer({
 	async function handleAcceptInvitation(invitation: InvitationLike) {
 		const invitationId = getInvitationId(invitation);
 		if (!invitationId) {
-			toast.error("Missing invitation ID");
+			toast.error("ID d’invitation manquant");
 			return;
 		}
 
@@ -98,7 +98,9 @@ export function PendingInvitationsDrawer({
 				invitationId,
 			});
 			if (error) {
-				throw new Error(error.message ?? "Failed to accept invitation");
+				throw new Error(
+					error.message ?? "Acceptation de l’invitation impossible",
+				);
 			}
 
 			const acceptedOrganizationId =
@@ -114,16 +116,18 @@ export function PendingInvitationsDrawer({
 				if (setActiveError) {
 					throw new Error(
 						setActiveError.message ??
-							"Invitation accepted, but switching organization failed",
+							"L’invitation est acceptée, mais le changement d’organisation a échoué",
 					);
 				}
 			}
 
 			await loadInvitations();
-			toast.success("Invitation accepted");
+			toast.success("Invitation acceptée");
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to accept invitation",
+				error instanceof Error
+					? error.message
+					: "Acceptation de l’invitation impossible",
 			);
 		} finally {
 			setProcessingInvitationId(null);
@@ -145,43 +149,43 @@ export function PendingInvitationsDrawer({
 					>
 						<Mail className="size-4" />
 						{collapsed ? (
-							<span className="sr-only">Pending invites</span>
+							<span className="sr-only">Invitations</span>
 						) : (
-							<span>Pending invites</span>
+							<span>Invitations</span>
 						)}
 					</Button>
 				</DrawerTrigger>
 			) : null}
 			<DrawerContent className="w-full border-border/70 sm:w-[40rem] sm:max-w-[40rem]">
 				<DrawerHeader className="border-b border-border/70 px-6 py-5 text-left">
-					<DrawerTitle className="text-lg">Pending invites</DrawerTitle>
+					<DrawerTitle className="text-lg">Invitations</DrawerTitle>
 					<DrawerDescription className="max-w-lg text-sm leading-6">
-						Review invitations sent to your account and switch into an
-						organization as soon as you accept.
+						Consultez les invitations reçues et basculez dans l’organisation dès
+						acceptation.
 					</DrawerDescription>
 				</DrawerHeader>
 				<div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
 					<div className="space-y-3">
 						<div>
 							<h3 className="text-sm font-medium text-foreground">
-								Your invitations
+								Vos invitations
 							</h3>
 							<p className="text-sm text-muted-foreground">
-								Accepted invitations become your active organization
-								immediately.
+								Les invitations acceptées deviennent immédiatement votre
+								organisation active.
 							</p>
 						</div>
 						{error ? <p className="text-sm text-destructive">{error}</p> : null}
 						{loading ? (
 							<div className="flex items-center justify-center rounded-xl border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
 								<Loader2 className="mr-2 size-4 animate-spin" />
-								Loading pending invitations
+								Chargement des invitations
 							</div>
 						) : !invitations.length ? (
 							<div className="rounded-xl border border-dashed border-border/70 bg-muted/30 p-8 text-center">
 								<Mail className="mx-auto size-8 text-muted-foreground/60" />
 								<p className="mt-3 text-sm text-muted-foreground">
-									No pending invitations right now.
+									Aucune invitation en attente.
 								</p>
 							</div>
 						) : (
@@ -203,7 +207,7 @@ export function PendingInvitationsDrawer({
 														<p className="truncate text-lg font-semibold text-foreground">
 															{invitation.organizationName ??
 																invitation.organizationSlug ??
-																"Organization invitation"}
+																"Invitation d’organisation"}
 														</p>
 														<p className="text-sm text-muted-foreground">
 															{invitation.email}
@@ -211,7 +215,7 @@ export function PendingInvitationsDrawer({
 													</div>
 													<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
 														<Badge variant="outline">
-															{invitation.role ?? "member"}
+															{invitation.role === "admin" ? "admin" : "membre"}
 														</Badge>
 														{invitation.status ? (
 															<Badge variant="secondary">
@@ -219,7 +223,7 @@ export function PendingInvitationsDrawer({
 															</Badge>
 														) : null}
 														<span>
-															Expires {formatCreatedAt(invitation.expiresAt)}
+															Expire le {formatCreatedAt(invitation.expiresAt)}
 														</span>
 													</div>
 												</div>
@@ -236,7 +240,7 @@ export function PendingInvitationsDrawer({
 													) : (
 														<UserCheck className="size-4" />
 													)}
-													Accept
+													Accepter
 												</Button>
 											</div>
 										</div>
@@ -294,10 +298,10 @@ function readNestedString(value: unknown, objectKey: string, key: string) {
 
 function formatCreatedAt(createdAt: Date | string | number | null | undefined) {
 	if (!createdAt) {
-		return "Unknown";
+		return "Inconnu";
 	}
 
-	return new Intl.DateTimeFormat("en", {
+	return new Intl.DateTimeFormat("fr-FR", {
 		dateStyle: "long",
 	}).format(new Date(createdAt));
 }

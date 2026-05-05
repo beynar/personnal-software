@@ -1,12 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import {
-	Activity,
+	AlertTriangle,
 	ArrowRight,
-	Cloud,
-	Database,
-	Layers3,
-	UserRound,
+	CheckCircle2,
+	Package,
+	Scale,
 } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -14,173 +15,245 @@ import {
 	CardHeader,
 	CardTitle,
 } from "~/components/ui/card";
+import { Progress } from "~/components/ui/progress";
+import { Skeleton } from "~/components/ui/skeleton";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "~/components/ui/table";
 
-const overviewCards = [
-	{
-		title: "Convex auth",
-		description:
-			"Authentication stays reactive at the layout boundary, so nested pages inherit the session.",
-		icon: Activity,
-	},
-	{
-		title: "Cloudflare deploy",
-		description:
-			"The worker deploy path remains isolated from what the end user sees in the dashboard.",
-		icon: Cloud,
-	},
-	{
-		title: "Design system",
-		description:
-			"Use the nested page to inspect the current UI primitives available in the template.",
-		icon: Layers3,
-	},
-	{
-		title: "Profile scaffold",
-		description:
-			"Authenticated users now get a starter settings page for name, username, and bio.",
-		icon: UserRound,
-	},
-] as const;
+type DashboardData = {
+	stats: {
+		totalProducts: number;
+		calculated: number;
+		calculatedPercent: number;
+		missingWeight: number;
+		missingMaterial: number;
+	};
+	byCategory: Array<{
+		category: string;
+		total: number;
+		calculated: number;
+		percent: number;
+	}>;
+	attention: Array<{
+		_id: string;
+		name: string;
+		zone?: string | null;
+		molteniCategory: string;
+		missingFields: string[];
+	}>;
+};
 
 export const Route = createFileRoute("/dashboard/")({
 	staticData: {
 		dashboardHeader: {
-			description: "Starter workspace with a persistent shell and nested pages",
-			title: "Overview",
+			description: "Complétude et calculs du showroom de Lyon",
+			title: "Tableau de bord inventaire",
 		},
 	},
 	loader: async ({ context }) => {
-		// Reference SSR path for new features:
-		// route loader -> context.getOrpc() -> oRPC capability -> backend logic.
-		// Do not self-fetch /api/v1/* from loaders when the request is already on
-		// the server. Add client-side Convex hooks separately only if the page
-		// needs live updates after first paint.
 		const orpc = context.getOrpc();
-
-		return orpc.examples.workflow({
-			params: { exampleId: "starter" },
-			query: {
-				q: "dashboard",
-				limit: 3,
-				dryRun: true,
-				channel: "email",
-			},
-			body: {
-				message: "Dashboard shell boot preview",
-				priority: "normal",
-			},
-		});
+		await orpc.molteni.bootstrap();
+		return await orpc.molteni.dashboard();
 	},
+	pendingComponent: DashboardSkeleton,
 	component: DashboardOverviewPage,
 });
 
 function DashboardOverviewPage() {
-	const workflowPreview = Route.useLoaderData();
+	const data = Route.useLoaderData() as DashboardData;
+	const stats = data.stats;
+	const cards = [
+		{
+			label: "Produits",
+			value: stats.totalProducts,
+			progress: 100,
+			icon: Package,
+			help: "Fiches actives du showroom",
+		},
+		{
+			label: "Calculés",
+			value: `${stats.calculated} / ${stats.totalProducts}`,
+			progress: stats.calculatedPercent,
+			icon: CheckCircle2,
+			help: `${stats.calculatedPercent}% prêts pour les étiquettes`,
+		},
+		{
+			label: "Poids manquant",
+			value: stats.missingWeight,
+			progress: completion(stats.missingWeight, stats.totalProducts),
+			icon: Scale,
+			help: "Produits bloqués par un poids manquant",
+		},
+		{
+			label: "Matière manquante",
+			value: stats.missingMaterial,
+			progress: completion(stats.missingMaterial, stats.totalProducts),
+			icon: AlertTriangle,
+			help: "Requise pour Meuble et siège sans rembourrage",
+		},
+	];
 
 	return (
 		<div className="space-y-6">
-			<Card className="overflow-hidden border-border/70">
-				<CardHeader className="gap-3 border-b border-border/70 bg-card/70">
-					<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-						<Database className="size-4" />
-						Overview
-					</div>
-					<CardTitle className="text-3xl">A nested dashboard shell</CardTitle>
-					<CardDescription className="max-w-2xl text-sm leading-6">
-						The sidebar now belongs to the dashboard layout itself. Moving
-						between nested pages keeps the navigation in place and makes the app
-						feel like one workspace instead of a set of unrelated screens.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
-					{overviewCards.map((card) => (
-						<div
-							className="rounded-2xl border border-border/70 bg-background/70 p-4"
-							key={card.title}
-						>
-							<div className="flex size-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
-								<card.icon className="size-4" />
+			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+				{cards.map((card) => (
+					<Card className="border-border/70" key={card.label}>
+						<CardHeader className="pb-3">
+							<div className="flex items-center justify-between gap-3">
+								<CardDescription>{card.label}</CardDescription>
+								<div className="flex size-9 items-center justify-center rounded-md bg-accent text-accent-foreground">
+									<card.icon className="size-4" />
+								</div>
 							</div>
-							<p className="mt-4 font-medium">{card.title}</p>
-							<p className="mt-1 text-sm leading-6 text-muted-foreground">
-								{card.description}
-							</p>
-						</div>
-					))}
-				</CardContent>
-			</Card>
-			<div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+							<CardTitle className="text-3xl">{card.value}</CardTitle>
+						</CardHeader>
+						<CardContent className="space-y-2">
+							<Progress value={card.progress} />
+							<p className="text-sm text-muted-foreground">{card.help}</p>
+						</CardContent>
+					</Card>
+				))}
+			</div>
+
+			<div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
 				<Card className="border-border/70">
 					<CardHeader>
-						<CardTitle>Navigation test</CardTitle>
+						<CardTitle>Complétude par catégorie</CardTitle>
 						<CardDescription>
-							Use the sidebar to move to the nested design system page and
-							confirm that the shell stays mounted.
+							La progression utilise les produits avec éco-participation
+							calculée.
 						</CardDescription>
 					</CardHeader>
-					<CardContent className="space-y-3 text-sm text-muted-foreground">
-						<div className="rounded-xl border border-border/70 bg-background/70 p-4">
-							<p className="font-medium text-foreground">1. Overview</p>
-							<p className="mt-1">
-								This page explains the shell and confirms the dashboard route is
-								now a layout.
-							</p>
-						</div>
-						<div className="rounded-xl border border-border/70 bg-background/70 p-4">
-							<p className="font-medium text-foreground">2. Design System</p>
-							<p className="mt-1">
-								The nested showcase page renders the current UI primitives
-								available in the template.
-							</p>
-						</div>
-						<div className="rounded-xl border border-border/70 bg-background/70 p-4">
-							<p className="font-medium text-foreground">3. Profile</p>
-							<p className="mt-1">
-								Use the profile page as a starter settings surface for
-								user-owned account data.
-							</p>
-						</div>
+					<CardContent>
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Catégorie</TableHead>
+									<TableHead className="text-right">Prêts</TableHead>
+									<TableHead className="w-[180px]">Progression</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{data.byCategory.map((row) => (
+									<TableRow key={row.category}>
+										<TableCell className="font-medium">
+											{row.category}
+										</TableCell>
+										<TableCell className="text-right">
+											{row.calculated} / {row.total}
+										</TableCell>
+										<TableCell>
+											<div className="flex items-center gap-3">
+												<Progress value={row.percent} />
+												<span className="w-9 text-right text-sm text-muted-foreground">
+													{row.percent}%
+												</span>
+											</div>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
 					</CardContent>
 				</Card>
+
 				<Card className="border-border/70">
-					<CardHeader>
-						<CardTitle>What changed</CardTitle>
-						<CardDescription>
-							User-facing navigation is now separate from the code examples kept
-							in the repository.
-						</CardDescription>
+					<CardHeader className="flex-row items-center justify-between gap-4">
+						<div>
+							<CardTitle>À compléter</CardTitle>
+							<CardDescription>
+								Produits incomplets triés par donnée bloquante.
+							</CardDescription>
+						</div>
+						<Button asChild variant="outline">
+							<Link to="/dashboard/products" viewTransition>
+								Tout voir
+								<ArrowRight className="size-4" />
+							</Link>
+						</Button>
 					</CardHeader>
-					<CardContent className="space-y-4">
-						<div className="rounded-xl bg-muted/60 p-4">
-							<p className="font-medium">Sidebar cleanup</p>
-							<p className="mt-1 text-sm text-muted-foreground">
-								The footer stays readable when collapsed and no longer exposes
-								LLM-only guidance in user land.
-							</p>
-						</div>
-						<div className="rounded-xl bg-muted/60 p-4">
-							<p className="font-medium">Nested structure</p>
-							<p className="mt-1 text-sm text-muted-foreground">
-								The dashboard now ships with overview, profile, and design
-								system child pages under one persistent shell.
-							</p>
-						</div>
-						<div className="rounded-xl bg-muted/60 p-4">
-							<p className="font-medium">oRPC loader preview</p>
-							<p className="mt-1 text-sm text-muted-foreground">
-								{workflowPreview.message}
-							</p>
-							<p className="mt-2 text-xs text-muted-foreground">
-								{workflowPreview.preview.join(" • ")}
-							</p>
-						</div>
-						<div className="flex items-center gap-2 text-sm font-medium text-foreground">
-							<ArrowRight className="size-4" />
-							Head to “Profile” or “Design System” in the sidebar.
-						</div>
+					<CardContent>
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Produit</TableHead>
+									<TableHead>Zone</TableHead>
+									<TableHead>Manquant</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{data.attention.map((row) => (
+									<TableRow key={row._id}>
+										<TableCell>
+											<Link
+												className="font-medium hover:underline"
+												params={{ productId: row._id }}
+												to="/dashboard/products/$productId"
+												viewTransition
+											>
+												{row.name}
+											</Link>
+											<p className="text-sm text-muted-foreground">
+												{row.molteniCategory}
+											</p>
+										</TableCell>
+										<TableCell>{row.zone ?? "-"}</TableCell>
+										<TableCell>
+											<div className="flex flex-wrap gap-1.5">
+												{row.missingFields.map((field) => (
+													<Badge key={field} variant="secondary">
+														{fieldLabel(field)}
+													</Badge>
+												))}
+											</div>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
 					</CardContent>
 				</Card>
 			</div>
 		</div>
 	);
+}
+
+function DashboardSkeleton() {
+	const skeletonCards = ["total", "calculated", "weight", "material"];
+
+	return (
+		<div className="space-y-6">
+			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+				{skeletonCards.map((card) => (
+					<Card className="border-border/70" key={card}>
+						<CardHeader>
+							<Skeleton className="h-4 w-28" />
+							<Skeleton className="h-9 w-20" />
+						</CardHeader>
+						<CardContent>
+							<Skeleton className="h-2 w-full" />
+						</CardContent>
+					</Card>
+				))}
+			</div>
+			<Skeleton className="h-80 w-full" />
+		</div>
+	);
+}
+
+function completion(missing: number, total: number) {
+	if (total === 0) return 0;
+	return Math.round(((total - missing) / total) * 100);
+}
+
+function fieldLabel(field: string) {
+	if (field === "weight") return "Poids";
+	if (field === "material") return "Matériau";
+	return "Barème";
 }

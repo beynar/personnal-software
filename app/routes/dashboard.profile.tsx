@@ -6,8 +6,8 @@ import { api } from "../../convex/_generated/api";
 export const Route = createFileRoute("/dashboard/profile")({
 	staticData: {
 		dashboardHeader: {
-			description: "Manage your account details and profile picture.",
-			title: "Profile",
+			description: "Gérez les informations du compte et la photo de profil.",
+			title: "Profil",
 		},
 	},
 	component: DashboardProfileRoute,

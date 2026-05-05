@@ -23,15 +23,13 @@ export function PublicAuthCard({
 		<Card className="w-full max-w-sm">
 			<CardHeader className="text-center">
 				<CardTitle className="text-2xl">{PROJECT_NAME}</CardTitle>
-				<CardDescription>
-					Sign in to your account or create a new one
-				</CardDescription>
+				<CardDescription>Connectez-vous ou créez un compte</CardDescription>
 			</CardHeader>
 			<CardContent>
 				<Tabs defaultValue="login">
 					<TabsList className="grid w-full grid-cols-2">
-						<TabsTrigger value="login">Login</TabsTrigger>
-						<TabsTrigger value="signup">Create Account</TabsTrigger>
+						<TabsTrigger value="login">Connexion</TabsTrigger>
+						<TabsTrigger value="signup">Créer un compte</TabsTrigger>
 					</TabsList>
 					<TabsContent value="login">
 						<LoginForm onAuthSuccess={onAuthSuccess} />
@@ -61,7 +59,7 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				password,
 			});
 			if (authError) {
-				toast.error(authError.message ?? "Failed to sign in");
+				toast.error(authError.message ?? "Connexion impossible");
 				return;
 			}
 			await ensureOrganizationForSession(authClient, { email });
@@ -71,7 +69,7 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				navigate({ to: "/dashboard" });
 			}
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : "Failed to sign in");
+			toast.error(err instanceof Error ? err.message : "Connexion impossible");
 		} finally {
 			setLoading(false);
 		}
@@ -91,7 +89,7 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				/>
 			</div>
 			<div className="space-y-2">
-				<Label htmlFor="login-password">Password</Label>
+				<Label htmlFor="login-password">Mot de passe</Label>
 				<Input
 					id="login-password"
 					name="password"
@@ -101,7 +99,7 @@ function LoginForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				/>
 			</div>
 			<Button type="submit" className="w-full" disabled={loading}>
-				{loading ? "Signing in…" : "Sign In"}
+				{loading ? "Connexion…" : "Se connecter"}
 			</Button>
 		</form>
 	);
@@ -121,7 +119,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 		const superAdminPassword = formData.get("superAdminPassword") as string;
 
 		if (password !== confirmPassword) {
-			toast.error("Passwords do not match");
+			toast.error("Les mots de passe ne correspondent pas");
 			return;
 		}
 
@@ -136,7 +134,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				},
 			);
 			if (authError) {
-				toast.error(authError.message ?? "Failed to create account");
+				toast.error(authError.message ?? "Création du compte impossible");
 				return;
 			}
 			await waitForAuthSession();
@@ -148,7 +146,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 			}
 		} catch (err) {
 			toast.error(
-				err instanceof Error ? err.message : "Failed to create account",
+				err instanceof Error ? err.message : "Création du compte impossible",
 			);
 		} finally {
 			setLoading(false);
@@ -158,7 +156,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 	return (
 		<form onSubmit={handleSubmit} className="mt-4 space-y-4">
 			<div className="space-y-2">
-				<Label htmlFor="signup-name">Name</Label>
+				<Label htmlFor="signup-name">Nom</Label>
 				<Input
 					id="signup-name"
 					name="name"
@@ -180,7 +178,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				/>
 			</div>
 			<div className="space-y-2">
-				<Label htmlFor="signup-password">Password</Label>
+				<Label htmlFor="signup-password">Mot de passe</Label>
 				<Input
 					id="signup-password"
 					name="password"
@@ -190,7 +188,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				/>
 			</div>
 			<div className="space-y-2">
-				<Label htmlFor="signup-confirm">Confirm Password</Label>
+				<Label htmlFor="signup-confirm">Confirmation</Label>
 				<Input
 					id="signup-confirm"
 					name="confirmPassword"
@@ -201,7 +199,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 			</div>
 			<div className="space-y-2">
 				<Label htmlFor="signup-super-admin-password">
-					Super Admin Password
+					Mot de passe super admin
 				</Label>
 				<Input
 					id="signup-super-admin-password"
@@ -212,7 +210,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				/>
 			</div>
 			<Button type="submit" className="w-full" disabled={loading}>
-				{loading ? "Creating account…" : "Sign Up"}
+				{loading ? "Création du compte…" : "S’inscrire"}
 			</Button>
 		</form>
 	);
@@ -226,13 +224,13 @@ async function waitForAuthSession() {
 		}
 
 		if (error && attempt === 4) {
-			throw new Error(error.message ?? "Failed to load account session");
+			throw new Error(error.message ?? "Chargement de la session impossible");
 		}
 
 		await delay(100 * (attempt + 1));
 	}
 
-	throw new Error("Account created, but the session is not ready yet");
+	throw new Error("Compte créé, mais la session n’est pas encore prête");
 }
 
 function hasSession(value: unknown) {

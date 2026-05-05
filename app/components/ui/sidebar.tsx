@@ -163,13 +163,13 @@ function SidebarTrigger({
 
 	return (
 		<Button
-			className={cn("size-9 rounded-full", className)}
+			className={cn("size-9 rounded-full border-0 shadow-none", className)}
 			onClick={(event) => {
 				onClick?.(event);
 				toggleSidebar();
 			}}
 			size="icon"
-			variant="outline"
+			variant="ghost"
 			{...props}
 		>
 			<PanelLeftIcon className="size-4" />
@@ -202,7 +202,7 @@ function SidebarMenuButton({
 	return (
 		<Comp
 			className={cn(
-				"flex h-9 w-full items-center gap-2 rounded-lg px-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-hidden focus:ring-2 focus:ring-ring",
+				"flex h-9 w-full items-center gap-2 overflow-hidden rounded-lg px-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-hidden focus:ring-2 focus:ring-ring",
 				isActive && "bg-accent text-accent-foreground shadow-sm",
 				isCollapsed && !isMobile && "justify-center px-0",
 				className,

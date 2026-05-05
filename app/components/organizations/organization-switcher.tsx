@@ -12,6 +12,11 @@ import {
 } from "~/components/ui/popover";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Skeleton } from "~/components/ui/skeleton";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import { CreateOrganizationDialog } from "./create-organization-dialog";
@@ -62,54 +67,70 @@ export function OrganizationSwitcher({
 		setSwitchingOrganizationId(null);
 
 		if (setActiveError) {
-			setError(setActiveError.message ?? "Failed to switch organization");
+			setError(
+				setActiveError.message ?? "Changement d’organisation impossible",
+			);
 			return;
 		}
 
 		setOpen(false);
 	}
 
+	const organizationLabel = currentOrganization?.name ?? "Choisir un espace";
+	const triggerButton = (
+		<Button
+			className="h-full w-full justify-between rounded-none border-0 bg-transparent px-2 text-left text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent/70"
+			variant="ghost"
+		>
+			<div
+				className={`flex min-w-0 items-center ${isCollapsed ? "w-full justify-center gap-0" : "gap-3"}`}
+			>
+				<Avatar
+					className={cn(
+						"border border-sidebar-border/70 bg-sidebar-accent",
+						isCollapsed ? "size-10" : "size-6.5",
+					)}
+					size={isCollapsed ? "lg" : "default"}
+				>
+					<AvatarImage
+						alt={currentOrganization?.name ?? "Organisation"}
+						src={currentOrganization?.logo ?? undefined}
+					/>
+					<AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground">
+						{getInitials(currentOrganization?.name)}
+					</AvatarFallback>
+				</Avatar>
+				{isCollapsed ? null : (
+					<p className="truncate text-sm font-semibold tracking-tight">
+						{organizationLabel}
+					</p>
+				)}
+			</div>
+			{isCollapsed ? null : (
+				<ChevronDown className="size-4 shrink-0 text-sidebar-accent-foreground/70" />
+			)}
+		</Button>
+	);
+
 	return (
 		<>
 			<Popover onOpenChange={setOpen} open={open}>
-				<PopoverTrigger asChild>
-					{loadingActiveOrganization || loadingOrganizations ? (
+				{loadingActiveOrganization || loadingOrganizations ? (
+					<PopoverTrigger asChild>
 						<OrganizationSwitcherSkeleton isCollapsed={isCollapsed} />
-					) : (
-						<Button
-							className="h-full w-full justify-between rounded-none border-0 bg-transparent px-2 text-left text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent/70"
-							variant="ghost"
-						>
-							<div
-								className={`flex min-w-0 items-center ${isCollapsed ? "w-full justify-center gap-0" : "gap-3"}`}
-							>
-								<Avatar
-									className={cn(
-										"border border-sidebar-border/70 bg-sidebar-accent",
-										isCollapsed ? "size-10" : "size-6.5",
-									)}
-									size={isCollapsed ? "lg" : "default"}
-								>
-									<AvatarImage
-										alt={currentOrganization?.name ?? "Organization"}
-										src={currentOrganization?.logo ?? undefined}
-									/>
-									<AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground">
-										{getInitials(currentOrganization?.name)}
-									</AvatarFallback>
-								</Avatar>
-								{isCollapsed ? null : (
-									<p className="truncate text-sm font-semibold tracking-tight">
-										{currentOrganization?.name ?? "Choose workspace"}
-									</p>
-								)}
-							</div>
-							{isCollapsed ? null : (
-								<ChevronDown className="size-4 shrink-0 text-sidebar-accent-foreground/70" />
-							)}
-						</Button>
-					)}
-				</PopoverTrigger>
+					</PopoverTrigger>
+				) : isCollapsed ? (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
+						</TooltipTrigger>
+						<TooltipContent side="right" sideOffset={10}>
+							{organizationLabel}
+						</TooltipContent>
+					</Tooltip>
+				) : (
+					<PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
+				)}
 				<PopoverContent
 					align="start"
 					alignOffset={4}
@@ -124,7 +145,7 @@ export function OrganizationSwitcher({
 							<Input
 								className="h-7.5 border-0 bg-transparent px-2 pl-7.5 text-sm shadow-none focus-visible:border-0 focus-visible:ring-0"
 								onChange={(event) => setSearch(event.target.value)}
-								placeholder="Search organizations"
+								placeholder="Rechercher une organisation"
 								value={search}
 							/>
 						</div>
@@ -133,7 +154,7 @@ export function OrganizationSwitcher({
 						{loadingOrganizations ? (
 							<div className="flex items-center justify-center rounded-md border border-dashed border-border/60 px-3 py-4 text-sm text-muted-foreground">
 								<Loader2 className="mr-2 size-4 animate-spin" />
-								Loading organizations
+								Chargement des organisations
 							</div>
 						) : filteredOrganizations.length ? (
 							<ScrollArea className="max-h-56 pr-1">
@@ -187,13 +208,13 @@ export function OrganizationSwitcher({
 							<div className="rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-4 text-center">
 								<p className="text-sm font-medium">
 									{search.trim()
-										? "No organizations found"
-										: "No organizations yet"}
+										? "Aucune organisation trouvée"
+										: "Aucune organisation"}
 								</p>
 								<p className="mt-1 text-sm text-muted-foreground">
 									{search.trim()
-										? "Try a different name."
-										: "Create your first organization to start collaborating."}
+										? "Essayez un autre nom."
+										: "Créez une première organisation pour commencer."}
 								</p>
 							</div>
 						)}
@@ -209,7 +230,7 @@ export function OrganizationSwitcher({
 							variant="outline"
 						>
 							<Plus className="size-4" />
-							Create organization
+							Créer une organisation
 						</Button>
 					</div>
 				</PopoverContent>
