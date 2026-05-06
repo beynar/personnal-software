@@ -1,9 +1,9 @@
-import { normalizeCode, resolveProvider } from "@cloudflare/codemode";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { handleApiRequest } from "~/lib/api";
-import { getExecutor } from "~/lib/codemode";
+import { normalizeMcpCode } from "~/lib/mcp-code";
+import { getExecutor } from "~/lib/mcp-sandbox";
 import {
 	type CatalogEntry,
 	buildCatalog,
@@ -366,44 +366,17 @@ async function executeSandboxedCode(
 	result: unknown;
 	logs: string[];
 }> {
-	const provider = resolveProvider({
+	const provider = {
 		name: "openapi",
 		tools: {
-			callRoute: {
-				inputSchema: z.object({
-					method: z.string().optional(),
-					path: z.string().optional(),
-					params: z
-						.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-						.optional(),
-					query: z
-						.record(
-							z.string(),
-							z.union([
-								z.string(),
-								z.number(),
-								z.boolean(),
-								z.null(),
-								z.array(
-									z.union([z.string(), z.number(), z.boolean(), z.null()]),
-								),
-							]),
-						)
-						.optional(),
-					headers: z.record(z.string(), z.string()).optional(),
-					body: z.unknown().optional(),
-				}),
-				description:
-					"Call an OpenAPI route through the host. Input: { method?: string, path?: string, params?: Record<string, string | number | boolean>, query?: Record<string, string | number | boolean | null | Array<string | number | boolean | null>>, headers?: Record<string, string>, body?: unknown }.",
-				execute: async (input: unknown) => {
-					requireSession(authInfo);
-					return executeApiRoute(input as ExecuteInput, authInfo);
-				},
+			callRoute: async (input: unknown) => {
+				requireSession(authInfo);
+				return executeApiRoute(input as ExecuteInput, authInfo);
 			},
 		},
-	});
+	};
 
-	const normalizedUserCode = normalizeCode(code);
+	const normalizedUserCode = normalizeMcpCode(code).code;
 	const wrappedCode = `async () => {
 ${buildApiProxyPrelude()}
 	const __userCode = (${normalizedUserCode});
@@ -501,11 +474,9 @@ export function registerMcpTools(server: McpServer): void {
 		{
 			title: "Execute Code",
 			description:
-				'Execute JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox exposes an `api.*` proxy derived from executable OpenAPI routes. Use `search-routes` first to discover available routes and their input/output types, then call them with route-shaped code such as `await api.examples.exampleId.workflow.post({ params: { exampleId: "sample" }, query: { q: "widget", limit: 5, dryRun: true, channel: "email" }, body: { message: "hello", priority: "high" } })`. Parameterized path segments become plain parameter-name properties in the proxy. Route method calls accept an object with optional `params`, `query`, `headers`, and `body`. The submitted code must be an async arrow function.',
+				'Execute JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox exposes an `api.*` proxy derived from executable OpenAPI routes. Use `search-routes` first to discover available routes and their input/output types, then call them with route-shaped code such as `await api.examples.exampleId.workflow.post({ params: { exampleId: "sample" }, query: { q: "widget", limit: 5, dryRun: true, channel: "email" }, body: { message: "hello", priority: "high" } })`. Parameterized path segments become plain parameter-name properties in the proxy. Route method calls accept an object with optional `params`, `query`, `headers`, and `body`. Code is normalized before execution, so fenced code blocks, expressions, top-level await, function declarations, and export defaults are accepted.',
 			inputSchema: z.object({
-				code: z
-					.string()
-					.describe("JavaScript async arrow function to execute."),
+				code: z.string().describe("JavaScript code to normalize and execute."),
 			}),
 		},
 		async ({ code }, extra) => {
@@ -516,6 +487,28 @@ export function registerMcpTools(server: McpServer): void {
 					{
 						type: "text",
 						text: JSON.stringify(execution, null, 2),
+					},
+				],
+			};
+		},
+	);
+
+	server.registerTool(
+		"normalize-code",
+		{
+			title: "Normalize Code",
+			description:
+				"Normalize JavaScript before calling `execute`. Use this when generated code may be fenced markdown, a bare expression, top-level await, a function declaration, or an export default. The returned code is the async function shape that the sandbox executes.",
+			inputSchema: z.object({
+				code: z.string().describe("JavaScript code to normalize."),
+			}),
+		},
+		async ({ code }) => {
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify(normalizeMcpCode(code), null, 2),
 					},
 				],
 			};

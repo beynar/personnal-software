@@ -229,7 +229,7 @@ This keeps the MCP surface thin: route discovery happens through `search-routes`
 
 ### Sandboxed code execution
 
-The `execute` tool runs code through `DynamicWorkerExecutor` using the Cloudflare Worker loader binding. The caller sends JavaScript, the host runs it inside an isolated Worker sandbox, and the sandbox can interact with executable OpenAPI routes through a recursive `api.*` proxy.
+The `execute` tool runs code through the local MCP sandbox executor using the Cloudflare Worker loader binding. The caller sends JavaScript, the host runs it inside an isolated Worker sandbox, and the sandbox can interact with executable OpenAPI routes through a recursive `api.*` proxy.
 
 Route discovery stays at the MCP top level through `search-routes`, which returns compact text signatures with TypeScript-like `input` and `output` types.
 
