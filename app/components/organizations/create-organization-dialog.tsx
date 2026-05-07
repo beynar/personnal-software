@@ -14,6 +14,11 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { authClient } from "~/lib/auth-client";
+import {
+	OrganizationSlugUnavailableError,
+	createOrganizationWithAvailableSlug,
+	toOrganizationSlug,
+} from "~/lib/organization";
 
 type CreateOrganizationDialogProps = {
 	onCreated?: () => void;
@@ -30,27 +35,53 @@ export function CreateOrganizationDialog({
 	const [slug, setSlug] = useState("");
 	const [creating, setCreating] = useState(false);
 	const [error, setError] = useState("");
+	const [slugSuggestion, setSlugSuggestion] = useState<string | null>(null);
 
 	async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		setError("");
-		if (!name.trim()) return;
+		setSlugSuggestion(null);
+		const trimmedName = name.trim();
+		const trimmedSlug = slug.trim();
+		if (!trimmedName) return;
 
-		const organizationSlug = slug.trim() || toOrganizationSlug(name);
-		setCreating(true);
-		const { error: createError } = await authClient.organization.create({
-			name: name.trim(),
-			slug: organizationSlug,
-		});
-		setCreating(false);
-
-		if (createError) {
-			setError(createError.message ?? "Création de l’organisation impossible");
+		const manualSlug = trimmedSlug ? toOrganizationSlug(trimmedSlug) : null;
+		if (trimmedSlug && !manualSlug) {
+			setError("Le slug doit contenir au moins une lettre ou un chiffre.");
 			return;
+		}
+
+		setCreating(true);
+		try {
+			await createOrganizationWithAvailableSlug(authClient, {
+				name: trimmedName,
+				preferredSlug: manualSlug ?? toOrganizationSlug(trimmedName),
+				retrySlugConflicts: !manualSlug,
+			});
+		} catch (createError) {
+			if (createError instanceof OrganizationSlugUnavailableError) {
+				setSlugSuggestion(createError.suggestedSlug);
+				setError(
+					createError.suggestedSlug
+						? `Slug déjà utilisé. Suggestion : ${createError.suggestedSlug}`
+						: "Slug déjà utilisé.",
+				);
+				return;
+			}
+
+			setError(
+				createError instanceof Error
+					? createError.message
+					: "Création de l’organisation impossible",
+			);
+			return;
+		} finally {
+			setCreating(false);
 		}
 
 		setName("");
 		setSlug("");
+		setSlugSuggestion(null);
 		onOpenChange(false);
 		onCreated?.();
 	}
@@ -58,6 +89,7 @@ export function CreateOrganizationDialog({
 	function handleOpenChange(nextOpen: boolean) {
 		if (!nextOpen && !creating) {
 			setError("");
+			setSlugSuggestion(null);
 		}
 		onOpenChange(nextOpen);
 	}
@@ -80,7 +112,11 @@ export function CreateOrganizationDialog({
 								<Input
 									autoFocus
 									id="organization-name"
-									onChange={(event) => setName(event.target.value)}
+									onChange={(event) => {
+										setName(event.target.value);
+										setError("");
+										setSlugSuggestion(null);
+									}}
 									placeholder="Northwind Studio"
 									value={name}
 								/>
@@ -89,7 +125,11 @@ export function CreateOrganizationDialog({
 								<Label htmlFor="organization-slug">Slug</Label>
 								<Input
 									id="organization-slug"
-									onChange={(event) => setSlug(event.target.value)}
+									onChange={(event) => {
+										setSlug(toOrganizationSlug(event.target.value));
+										setError("");
+										setSlugSuggestion(null);
+									}}
 									placeholder={
 										name ? toOrganizationSlug(name) : "northwind-studio"
 									}
@@ -98,6 +138,20 @@ export function CreateOrganizationDialog({
 							</div>
 						</div>
 						{error ? <p className="text-sm text-destructive">{error}</p> : null}
+						{slugSuggestion ? (
+							<Button
+								className="h-auto px-0 text-sm"
+								onClick={() => {
+									setSlug(slugSuggestion);
+									setError("");
+									setSlugSuggestion(null);
+								}}
+								type="button"
+								variant="link"
+							>
+								Utiliser {slugSuggestion}
+							</Button>
+						) : null}
 					</div>
 					<DialogFooter className="border-t border-border/70 px-6 py-4">
 						<Button
@@ -117,11 +171,4 @@ export function CreateOrganizationDialog({
 			</DialogContent>
 		</Dialog>
 	);
-}
-
-export function toOrganizationSlug(value: string) {
-	return value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-|-$/g, "");
 }

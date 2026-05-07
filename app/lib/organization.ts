@@ -14,6 +14,25 @@ type OrganizationCandidate = {
 	slug: string;
 };
 
+type CreateOrganizationArgs = {
+	keepCurrentActiveOrganization?: boolean;
+	name: string;
+	preferredSlug?: string | null;
+	retrySlugConflicts?: boolean;
+};
+
+export class OrganizationSlugUnavailableError extends Error {
+	readonly slug: string;
+	readonly suggestedSlug: string | null;
+
+	constructor(slug: string, suggestedSlug: string | null) {
+		super("Organization slug is unavailable");
+		this.name = "OrganizationSlugUnavailableError";
+		this.slug = slug;
+		this.suggestedSlug = suggestedSlug;
+	}
+}
+
 type SessionUser = {
 	email?: string | null;
 	name?: string | null;
@@ -73,21 +92,53 @@ async function createPersonalOrganization(
 ) {
 	const baseName = getPersonalOrganizationName(user);
 	const baseSlug = getPersonalOrganizationSlugBase(user);
+	const organization = await createOrganizationWithAvailableSlug(client, {
+		keepCurrentActiveOrganization: false,
+		name: baseName,
+		preferredSlug: baseSlug,
+	});
+	return organization.id;
+}
 
-	for (let suffix = 0; suffix < 100; suffix += 1) {
-		const candidate = getOrganizationCandidate(baseName, baseSlug, suffix);
+export async function createOrganizationWithAvailableSlug(
+	client: AuthClient,
+	args: CreateOrganizationArgs,
+) {
+	const name = normalizeLabel(args.name);
+	if (!name) {
+		throw new Error("Organization name is required");
+	}
+
+	const baseSlug =
+		toOrganizationSlug(args.preferredSlug ?? "") ||
+		toOrganizationSlug(name) ||
+		"organization";
+	const maxAttempts = args.retrySlugConflicts === false ? 1 : 100;
+
+	for (let suffix = 0; suffix < maxAttempts; suffix += 1) {
+		const candidate = getOrganizationCandidate(name, baseSlug, suffix);
 		const isSlugAvailable = await checkOrganizationSlug(client, candidate.slug);
 		if (!isSlugAvailable) {
 			continue;
 		}
 
-		const organizationId = await tryCreateOrganization(client, candidate);
-		if (organizationId) {
-			return organizationId;
+		const organization = await tryCreateOrganization(client, candidate, {
+			keepCurrentActiveOrganization:
+				args.keepCurrentActiveOrganization ?? false,
+		});
+		if (organization) {
+			return organization;
 		}
 	}
 
-	throw new Error("Failed to create a personal organization");
+	if (args.retrySlugConflicts === false) {
+		throw new OrganizationSlugUnavailableError(
+			baseSlug,
+			await findAvailableOrganizationSlug(client, baseSlug),
+		);
+	}
+
+	throw new Error("Failed to find an available organization slug");
 }
 
 async function checkOrganizationSlug(client: AuthClient, slug: string) {
@@ -110,9 +161,10 @@ async function checkOrganizationSlug(client: AuthClient, slug: string) {
 async function tryCreateOrganization(
 	client: AuthClient,
 	candidate: OrganizationCandidate,
+	options: { keepCurrentActiveOrganization: boolean },
 ) {
 	const { data, error } = await client.organization.create({
-		keepCurrentActiveOrganization: false,
+		keepCurrentActiveOrganization: options.keepCurrentActiveOrganization,
 		name: candidate.name,
 		slug: candidate.slug,
 	});
@@ -130,7 +182,11 @@ async function tryCreateOrganization(
 		readString(data, "organizationId") ??
 		readNestedString(data, "organization", "id");
 	if (createdOrganizationId) {
-		return createdOrganizationId;
+		return {
+			id: createdOrganizationId,
+			name: candidate.name,
+			slug: candidate.slug,
+		};
 	}
 
 	const refreshedOrganizations = await client.organization.list();
@@ -139,10 +195,32 @@ async function tryCreateOrganization(
 		throw new Error(refreshedListError);
 	}
 
-	return (
+	const fallbackId =
+		readOrganizationIdBySlug(refreshedOrganizations?.data, candidate.slug) ??
+		readOrganizationIdBySlug(refreshedOrganizations, candidate.slug) ??
 		readFirstOrganizationId(refreshedOrganizations?.data) ??
-		readFirstOrganizationId(refreshedOrganizations)
-	);
+		readFirstOrganizationId(refreshedOrganizations);
+	return fallbackId
+		? {
+				id: fallbackId,
+				name: candidate.name,
+				slug: candidate.slug,
+			}
+		: null;
+}
+
+async function findAvailableOrganizationSlug(
+	client: AuthClient,
+	baseSlug: string,
+) {
+	for (let suffix = 1; suffix < 100; suffix += 1) {
+		const candidateSlug = getOrganizationSlugCandidate(baseSlug, suffix);
+		if (await checkOrganizationSlug(client, candidateSlug)) {
+			return candidateSlug;
+		}
+	}
+
+	return null;
 }
 
 function getOrganizationCandidate(
@@ -151,18 +229,15 @@ function getOrganizationCandidate(
 	suffix: number,
 ): OrganizationCandidate {
 	const normalizedBaseSlug = baseSlug || "personal-organization";
-	if (suffix === 0) {
-		return {
-			name: baseName,
-			slug: normalizedBaseSlug,
-		};
-	}
-
-	const number = suffix + 1;
 	return {
-		name: `${baseName} ${number}`,
-		slug: `${normalizedBaseSlug}-${number}`,
+		name: baseName,
+		slug: getOrganizationSlugCandidate(normalizedBaseSlug, suffix),
 	};
+}
+
+function getOrganizationSlugCandidate(baseSlug: string, suffix: number) {
+	if (suffix === 0) return baseSlug;
+	return `${baseSlug}-${suffix + 1}`;
 }
 
 function getPersonalOrganizationName(user: SessionUser) {
@@ -172,7 +247,7 @@ function getPersonalOrganizationName(user: SessionUser) {
 
 function getPersonalOrganizationSlugBase(user: SessionUser) {
 	const label = normalizeLabel(user.name) ?? emailLabel(user.email);
-	return `${slugify(label)}-organization`;
+	return `${toOrganizationSlug(label)}-organization`;
 }
 
 function normalizeLabel(value: string | null | undefined) {
@@ -190,7 +265,7 @@ function toPossessive(value: string) {
 	return value.endsWith("s") ? `${value}'` : `${value}'s`;
 }
 
-function slugify(value: string) {
+export function toOrganizationSlug(value: string) {
 	return value
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
@@ -233,6 +308,25 @@ function readFirstOrganizationId(value: unknown) {
 	}
 
 	for (const item of value) {
+		const id = readString(item, "id");
+		if (id) {
+			return id;
+		}
+	}
+
+	return null;
+}
+
+function readOrganizationIdBySlug(value: unknown, slug: string) {
+	if (!Array.isArray(value)) {
+		return null;
+	}
+
+	for (const item of value) {
+		if (readString(item, "slug") !== slug) {
+			continue;
+		}
+
 		const id = readString(item, "id");
 		if (id) {
 			return id;

@@ -109,6 +109,31 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 	const navigate = useNavigate();
 	const [loading, setLoading] = useState(false);
 
+	async function finishSignUp(email: string, name: string) {
+		try {
+			await waitForAuthSession();
+			await ensureOrganizationForSession(authClient, { email, name });
+		} catch (err) {
+			toast.error("Compte créé, mais l’espace n’a pas pu être initialisé", {
+				action: {
+					label: "Réessayer",
+					onClick: () => {
+						void finishSignUp(email, name);
+					},
+				},
+				description: getErrorMessage(err),
+				duration: 10_000,
+			});
+			return;
+		}
+
+		if (onAuthSuccess) {
+			onAuthSuccess();
+		} else {
+			navigate({ to: "/dashboard" });
+		}
+	}
+
 	async function handleSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		const formData = new FormData(e.currentTarget);
@@ -137,13 +162,7 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 				toast.error(authError.message ?? "Création du compte impossible");
 				return;
 			}
-			await waitForAuthSession();
-			await ensureOrganizationForSession(authClient, { email, name });
-			if (onAuthSuccess) {
-				onAuthSuccess();
-			} else {
-				navigate({ to: "/dashboard" });
-			}
+			await finishSignUp(email, name);
 		} catch (err) {
 			toast.error(
 				err instanceof Error ? err.message : "Création du compte impossible",
@@ -214,6 +233,10 @@ function SignUpForm({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
 			</Button>
 		</form>
 	);
+}
+
+function getErrorMessage(error: unknown) {
+	return error instanceof Error ? error.message : undefined;
 }
 
 async function waitForAuthSession() {
