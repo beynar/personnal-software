@@ -64,6 +64,7 @@ const productFiltersSchema = z.object({
 			"Canapé",
 			"Pouf",
 			"Table",
+			"Bureau",
 			"Table basse",
 			"Table lounge",
 			"Meuble nuit",
