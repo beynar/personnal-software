@@ -361,18 +361,17 @@ export const getDeclaration = query({
 	handler: async (ctx, args) => {
 		const scope = await requireProductScope(ctx);
 		const products = await getActiveProducts(ctx, scope.organizationId);
-		const variants = await getVariantsForProducts(ctx, products);
 		const range = getQuarterRange(args.year, args.quarter);
-		const rows = products
-			.map((product) => toProductRow(product, variants.get(product._id) ?? []))
-			.filter((row) => {
-				if (!args.soldOnly) return true;
-				return Boolean(
-					row.soldDate &&
-						row.soldDate >= range.start &&
-						row.soldDate <= range.end,
-				);
-			});
+		const rows = (
+			await getDeclarationRows(ctx, products, scope.organizationId)
+		).filter((row) => {
+			if (!args.soldOnly) return true;
+			return Boolean(
+				row.soldDate &&
+					row.soldDate >= range.start &&
+					row.soldDate <= range.end,
+			);
+		});
 		const byFamily = ECOMAISON_FAMILIES.map((family) => {
 			const familyRows = rows.filter((row) => row.ecomaisonFamily === family);
 			return {
@@ -1312,6 +1311,42 @@ async function getVariantsForProducts(
 		}),
 	);
 	return new Map(entries);
+}
+
+async function getDeclarationRows(
+	ctx: QueryCtx,
+	products: Doc<"products">[],
+	organizationId: string,
+) {
+	const topLevelProducts = products.filter((product) => !product.parentId);
+	const entries = await Promise.all(
+		topLevelProducts.map(async (product) => {
+			if (!product.isComposition) {
+				const variants = await getVariantsForProducts(ctx, [product]);
+				return [toProductRow(product, variants.get(product._id) ?? [])];
+			}
+
+			const modules = await ctx.db
+				.query("products")
+				.withIndex("by_parent", (q) => q.eq("parentId", product._id))
+				.take(100);
+			const activeModules = modules.filter(
+				(moduleProduct) =>
+					moduleProduct.status !== "deleted" &&
+					moduleProduct.organizationId === organizationId,
+			);
+			const moduleVariants = await getVariantsForProducts(ctx, activeModules);
+			return activeModules.map((moduleProduct) => ({
+				...toProductRow(
+					moduleProduct,
+					moduleVariants.get(moduleProduct._id) ?? [],
+				),
+				name: `${product.name} - ${moduleProduct.name}`,
+				soldDate: product.soldDate ?? null,
+			}));
+		}),
+	);
+	return entries.flat();
 }
 
 async function getParentNames(
