@@ -9,7 +9,6 @@ import {
 	type MaterialTier,
 	SHOWROOM_KEY,
 	ZONES,
-	getDefaultFamily,
 	isMaterialAllowedWithDisruptors,
 	isMaterialRequired,
 	roundMoney,
@@ -21,7 +20,13 @@ import {
 	mutation,
 	query,
 } from "./_generated/server";
-import { authComponent } from "./auth";
+import {
+	getCompositionInScope,
+	getProductInScope,
+	requireProductInScope,
+	requireProductScope,
+	requireVariantInScope,
+} from "./productScope";
 
 const categoryValidator = v.union(
 	...MOLTENI_CATEGORIES.map((category) => v.literal(category)),
@@ -34,20 +39,26 @@ const materialTierValidator = v.union(
 );
 const zoneValidator = v.union(...ZONES.map((zone) => v.literal(zone)));
 const moduleKindValidator = v.union(v.literal("base"), v.literal("component"));
+const productTypeFilterValidator = v.union(
+	v.literal("all"),
+	v.literal("standalone"),
+	v.literal("composition"),
+	v.literal("module"),
+);
+const productStatusFilterValidator = v.union(
+	v.literal("all"),
+	v.literal("calculated"),
+	v.literal("incomplete"),
+	v.literal("sold"),
+);
+const compositionItemInputValidator = v.object({
+	moduleProductId: v.id("products"),
+	variantId: v.id("productVariants"),
+	quantity: v.number(),
+});
 const BASE_MODULE_NAME = "Base / Structure";
-
-type SeedProduct = {
-	category: (typeof MOLTENI_CATEGORIES)[number];
-	isComposition?: boolean;
-	moduleKind?: "base" | "component";
-	materialTier?: MaterialTier;
-	name: string;
-	notes: string;
-	priceHt?: number;
-	reference: string;
-	weightKg?: number;
-	zone: (typeof ZONES)[number];
-};
+const MAX_PRODUCT_PAGE_SIZE = 100;
+const PRODUCT_FILTER_READ_LIMIT = 1000;
 
 type StaticBaremeEntry = {
 	family: string;
@@ -63,77 +74,14 @@ type StaticBaremeEntry = {
 	officialProductCode?: string;
 };
 
-const seedProducts: SeedProduct[] = [
-	{
-		name: "GLOVE Fauteuil",
-		category: "Fauteuil",
-		zone: "A",
-		reference: "GLOVE-LOW",
-		weightKg: 32,
-		priceHt: 2850,
-		notes: "Exemple rembourré avec poids dans le barème partiel.",
-	},
-	{
-		name: "CHELSEA Chaise",
-		category: "Chaise",
-		zone: "B",
-		reference: "CHELSEA-CHAIR",
-		weightKg: 12,
-		notes: "Chaise non rembourrée par défaut, matière à confirmer.",
-	},
-	{
-		name: "ARC Table basse",
-		category: "Table basse",
-		zone: "C",
-		reference: "ARC-TB",
-		materialTier: "tous_materiaux",
-		weightKg: 42,
-		priceHt: 4100,
-		notes: "Table mixte initialisée au barème pénalisant.",
-	},
-	{
-		name: "DRESSING 505",
-		category: "Dressing",
-		zone: "F",
-		reference: "505-DRESSING",
-		isComposition: true,
-		notes: "Composition exemple. Ajouter les modules séparément.",
-	},
-	{
-		name: "PAUL Canapé composition",
-		category: "Canapé",
-		zone: "G",
-		reference: "PAUL-COMP",
-		isComposition: true,
-		notes: "Somme des modules, pas lookup sur poids total.",
-	},
-];
-
-/**
- * Idempotently seeds the Lyon showroom and a small product sample.
- */
-export const ensureSeedData = mutation({
-	args: {},
-	handler: async (ctx) => {
-		const userId = await requireUserId(ctx);
-		const now = Date.now();
-		const showroom = await getOrCreateShowroom(ctx, now);
-		await seedExampleProducts(ctx, showroom._id, userId, now);
-		return { showroomId: showroom._id };
-	},
-});
-
 /**
  * Returns dashboard inventory health for the authenticated showroom workspace.
  */
 export const getDashboard = query({
 	args: {},
 	handler: async (ctx) => {
-		await requireUserId(ctx);
-		const showroom = await getShowroom(ctx);
-		if (!showroom) return emptyDashboard();
-
-		const products = await getActiveProducts(ctx, showroom._id);
+		const scope = await requireProductScope(ctx);
+		const products = await getActiveProducts(ctx, scope.organizationId);
 		const variants = await getVariantsForProducts(ctx, products);
 		const rows = products.map((product) =>
 			toProductRow(product, variants.get(product._id) ?? []),
@@ -186,31 +134,18 @@ export const listProducts = query({
 		search: v.optional(v.string()),
 		zone: v.optional(zoneValidator),
 		category: v.optional(categoryValidator),
-		type: v.optional(
-			v.union(
-				v.literal("all"),
-				v.literal("standalone"),
-				v.literal("composition"),
-				v.literal("module"),
-			),
-		),
-		status: v.optional(
-			v.union(
-				v.literal("all"),
-				v.literal("calculated"),
-				v.literal("incomplete"),
-				v.literal("sold"),
-			),
-		),
+		type: v.optional(productTypeFilterValidator),
+		status: v.optional(productStatusFilterValidator),
 	},
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
-		const showroom = await getShowroom(ctx);
-		if (!showroom) return [];
-
-		const products = await getActiveProducts(ctx, showroom._id);
+		const scope = await requireProductScope(ctx);
+		const products = await getActiveProducts(ctx, scope.organizationId);
 		const variants = await getVariantsForProducts(ctx, products);
-		const parentNames = await getParentNames(ctx, products);
+		const parentNames = await getParentNames(
+			ctx,
+			products,
+			scope.organizationId,
+		);
 		const rows = products.map((product) => ({
 			...toProductRow(product, variants.get(product._id) ?? []),
 			parentName: product.parentId
@@ -232,6 +167,74 @@ export const listProducts = query({
 });
 
 /**
+ * Returns one filtered product table page plus visible count metadata.
+ */
+export const listProductsPage = query({
+	args: {
+		search: v.optional(v.string()),
+		zone: v.optional(v.union(v.literal("all"), zoneValidator)),
+		category: v.optional(v.union(v.literal("all"), categoryValidator)),
+		type: v.optional(productTypeFilterValidator),
+		status: v.optional(productStatusFilterValidator),
+		page: v.number(),
+		pageSize: v.number(),
+	},
+	handler: async (ctx, args) => {
+		const scope = await requireProductScope(ctx);
+		const pageSize = normalizePageSize(args.pageSize);
+		const page = normalizePage(args.page);
+
+		const zone = args.zone === "all" ? undefined : args.zone;
+		const category = args.category === "all" ? undefined : args.category;
+		const products = await getFilteredProductCandidates(ctx, {
+			category,
+			organizationId: scope.organizationId,
+			zone,
+		});
+		const variants = await getVariantsForProducts(ctx, products);
+		const parentNames = await getParentNames(
+			ctx,
+			products,
+			scope.organizationId,
+		);
+		const rows = products
+			.map((product) => ({
+				...toProductRow(product, variants.get(product._id) ?? []),
+				parentName: product.parentId
+					? (parentNames.get(product.parentId) ?? null)
+					: null,
+			}))
+			.filter((row) => row.moduleKind !== "base")
+			.filter((row) => matchesSearch(row, args.search))
+			.filter((row) => !zone || row.zone === zone)
+			.filter((row) => !category || row.molteniCategory === category)
+			.filter(
+				(row) => !args.type || args.type === "all" || row.type === args.type,
+			)
+			.filter((row) => matchesStatus(row, args.status));
+
+		const totalCount = rows.length;
+		const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+		const boundedPage = Math.min(page, totalPages - 1);
+		const startOffset = boundedPage * pageSize;
+		const pageRows = rows.slice(startOffset, startOffset + pageSize);
+		const endIndex = startOffset + pageRows.length;
+
+		return {
+			rows: pageRows,
+			page: boundedPage,
+			pageSize,
+			totalCount,
+			totalPages,
+			startIndex: totalCount === 0 ? 0 : startOffset + 1,
+			endIndex,
+			hasPreviousPage: boundedPage > 0,
+			hasNextPage: endIndex < totalCount,
+		};
+	},
+});
+
+/**
  * Returns a live, cursor-paginated product page for the inventory table.
  */
 export const listProductsPaginated = query({
@@ -240,40 +243,26 @@ export const listProductsPaginated = query({
 		search: v.optional(v.string()),
 		zone: v.optional(v.union(v.literal("all"), zoneValidator)),
 		category: v.optional(v.union(v.literal("all"), categoryValidator)),
-		type: v.optional(
-			v.union(
-				v.literal("all"),
-				v.literal("standalone"),
-				v.literal("composition"),
-				v.literal("module"),
-			),
-		),
-		status: v.optional(
-			v.union(
-				v.literal("all"),
-				v.literal("calculated"),
-				v.literal("incomplete"),
-				v.literal("sold"),
-			),
-		),
+		type: v.optional(productTypeFilterValidator),
+		status: v.optional(productStatusFilterValidator),
 	},
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
-		const showroom = await getShowroom(ctx);
-		if (!showroom) {
-			return { page: [], isDone: true, continueCursor: "" };
-		}
+		const scope = await requireProductScope(ctx);
 
 		const zone = args.zone === "all" ? undefined : args.zone;
 		const category = args.category === "all" ? undefined : args.category;
 		const productsPage = await paginateActiveProducts(ctx, {
 			category,
+			organizationId: scope.organizationId,
 			paginationOpts: args.paginationOpts,
-			showroomId: showroom._id,
 			zone,
 		});
 		const variants = await getVariantsForProducts(ctx, productsPage.page);
-		const parentNames = await getParentNames(ctx, productsPage.page);
+		const parentNames = await getParentNames(
+			ctx,
+			productsPage.page,
+			scope.organizationId,
+		);
 		const rows = productsPage.page.map((product) => ({
 			...toProductRow(product, variants.get(product._id) ?? []),
 			parentName: product.parentId
@@ -302,9 +291,13 @@ export const listProductsPaginated = query({
 export const getProduct = query({
 	args: { productId: v.id("products") },
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.status === "deleted") return null;
+		const scope = await requireProductScope(ctx);
+		const product = await getProductInScope(
+			ctx,
+			args.productId,
+			scope.organizationId,
+		);
+		if (!product) return null;
 
 		const variants = await ctx.db
 			.query("productVariants")
@@ -315,7 +308,9 @@ export const getProduct = query({
 			.withIndex("by_parent", (q) => q.eq("parentId", product._id))
 			.take(100);
 		const activeChildren = children.filter(
-			(child) => child.status !== "deleted",
+			(child) =>
+				child.status !== "deleted" &&
+				child.organizationId === scope.organizationId,
 		);
 		const childVariants = await getVariantsForProducts(ctx, activeChildren);
 		const childRows = activeChildren.map((child) =>
@@ -324,8 +319,13 @@ export const getProduct = query({
 		const baseModule =
 			childRows.find((child) => child.moduleKind === "base") ?? null;
 		const modules = childRows.filter((child) => child.moduleKind !== "base");
-		const parent = product.parentId ? await ctx.db.get(product.parentId) : null;
+		const parent = product.parentId
+			? await getProductInScope(ctx, product.parentId, scope.organizationId)
+			: null;
 		const totalRows = baseModule ? [baseModule, ...modules] : modules;
+		const savedCompositions = product.isComposition
+			? await getSavedCompositions(ctx, product._id)
+			: [];
 
 		return {
 			product: serializeProduct(product),
@@ -333,6 +333,7 @@ export const getProduct = query({
 			variants,
 			baseModule,
 			modules,
+			savedCompositions,
 			totalEcoHt: sumKnown(
 				totalRows.map((module) => module.ecoParticipationHt),
 			),
@@ -358,11 +359,8 @@ export const getDeclaration = query({
 		soldOnly: v.boolean(),
 	},
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
-		const showroom = await getShowroom(ctx);
-		if (!showroom) return emptyDeclaration();
-
-		const products = await getActiveProducts(ctx, showroom._id);
+		const scope = await requireProductScope(ctx);
+		const products = await getActiveProducts(ctx, scope.organizationId);
 		const variants = await getVariantsForProducts(ctx, products);
 		const range = getQuarterRange(args.year, args.quarter);
 		const rows = products
@@ -427,11 +425,14 @@ export const createProduct = mutation({
 		createBaseModule: v.optional(v.boolean()),
 	},
 	handler: async (ctx, args) => {
-		const userId = await requireUserId(ctx);
+		const scope = await requireProductScope(ctx);
 		validateProductInput(args);
 		const showroom = await getOrCreateShowroom(ctx, Date.now());
 		const now = Date.now();
 		const isComposition = args.isComposition && !args.parentId;
+		const parentProduct = args.parentId
+			? await requireProductInScope(ctx, args.parentId, scope.organizationId)
+			: null;
 		const productId = await ctx.db.insert("products", {
 			name: args.name.trim(),
 			molteniCategory: args.molteniCategory,
@@ -450,11 +451,12 @@ export const createProduct = mutation({
 			isComposition,
 			moduleKind: args.parentId ? (args.moduleKind ?? "component") : undefined,
 			parentId: args.parentId,
-			showroomId: showroom._id,
+			showroomId: parentProduct?.showroomId ?? showroom._id,
+			organizationId: scope.organizationId,
 			notes: normalizeOptional(args.notes),
 			status: "active",
 			tvaRate: args.tvaRate,
-			createdByUserId: userId,
+			createdByUserId: scope.userId,
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -489,9 +491,10 @@ export const createProduct = mutation({
 		if (isComposition && args.createBaseModule) {
 			await createBaseModule(ctx, {
 				parentProductId: productId,
+				organizationId: scope.organizationId,
 				source: args,
 				showroomId: showroom._id,
-				userId,
+				userId: scope.userId,
 				now,
 			});
 		}
@@ -526,12 +529,13 @@ export const updateProduct = mutation({
 		tvaRate: v.number(),
 	},
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const scope = await requireProductScope(ctx);
 		validateProductInput(args);
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.status === "deleted") {
-			throw new Error("Product not found");
-		}
+		const product = await requireProductInScope(
+			ctx,
+			args.productId,
+			scope.organizationId,
+		);
 
 		const now = Date.now();
 		const isComposition = args.isComposition && !product.parentId;
@@ -623,11 +627,12 @@ export const addVariant = mutation({
 		textileMode: v.optional(v.string()),
 	},
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.status === "deleted") {
-			throw new Error("Product not found");
-		}
+		const scope = await requireProductScope(ctx);
+		const product = await requireProductInScope(
+			ctx,
+			args.productId,
+			scope.organizationId,
+		);
 		if (product.isComposition) {
 			throw new Error("Composition products use modules, not variants");
 		}
@@ -676,13 +681,12 @@ export const updateVariant = mutation({
 		textileMode: v.optional(v.string()),
 	},
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
-		const variant = await ctx.db.get(args.variantId);
-		if (!variant) throw new Error("Variant not found");
-		const product = await ctx.db.get(variant.productId);
-		if (!product || product.status === "deleted") {
-			throw new Error("Product not found");
-		}
+		const scope = await requireProductScope(ctx);
+		const { product, variant } = await requireVariantInScope(
+			ctx,
+			args.variantId,
+			scope.organizationId,
+		);
 		if (product.isComposition) {
 			throw new Error("Composition products use modules, not variants");
 		}
@@ -719,13 +723,14 @@ export const updateVariant = mutation({
 export const deleteVariant = mutation({
 	args: { variantId: v.id("productVariants") },
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const scope = await requireProductScope(ctx);
 		const variant = await ctx.db.get(args.variantId);
 		if (!variant) return null;
-		const product = await ctx.db.get(variant.productId);
-		if (!product || product.status === "deleted") {
-			throw new Error("Product not found");
-		}
+		const product = await requireProductInScope(
+			ctx,
+			variant.productId,
+			scope.organizationId,
+		);
 		const variants = await ctx.db
 			.query("productVariants")
 			.withIndex("by_product", (q) => q.eq("productId", product._id))
@@ -748,12 +753,17 @@ export const setManualEcomaisonCode = mutation({
 		code: v.union(v.string(), v.null()),
 	},
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const scope = await requireProductScope(ctx);
+		const { variant } = await requireVariantInScope(
+			ctx,
+			args.variantId,
+			scope.organizationId,
+		);
 		const normalized = args.code?.trim();
 		if (normalized && !/^\d{11}$/.test(normalized)) {
 			throw new Error("Ecomaison code must contain exactly 11 digits");
 		}
-		await ctx.db.patch(args.variantId, {
+		await ctx.db.patch(variant._id, {
 			isEcomaisonCodeManual: Boolean(normalized),
 			manualEcomaisonCode11: normalized || undefined,
 			updatedAt: Date.now(),
@@ -769,7 +779,8 @@ export const setManualEcomaisonCode = mutation({
 export const softDeleteProduct = mutation({
 	args: { productId: v.id("products") },
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const scope = await requireProductScope(ctx);
+		await requireProductInScope(ctx, args.productId, scope.organizationId);
 		await ctx.db.patch(args.productId, {
 			status: "deleted",
 			updatedAt: Date.now(),
@@ -787,7 +798,8 @@ export const setSoldDate = mutation({
 		soldDate: v.union(v.string(), v.null()),
 	},
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const scope = await requireProductScope(ctx);
+		await requireProductInScope(ctx, args.productId, scope.organizationId);
 		await ctx.db.patch(args.productId, {
 			soldDate: args.soldDate ?? undefined,
 			updatedAt: Date.now(),
@@ -796,11 +808,122 @@ export const setSoldDate = mutation({
 	},
 });
 
-async function requireUserId(ctx: QueryOrMutationCtx) {
-	const authUser = await authComponent.safeGetAuthUser(ctx);
-	if (!authUser?.userId) throw new Error("Not authenticated");
-	return authUser.userId as unknown as Id<"users">;
-}
+/**
+ * Saves a named composition configuration made from selected module variants.
+ * Snapshot fields keep the saved total stable if modules change later.
+ */
+export const createProductComposition = mutation({
+	args: {
+		productId: v.id("products"),
+		name: v.string(),
+		notes: v.optional(v.string()),
+		items: v.array(compositionItemInputValidator),
+	},
+	handler: async (ctx, args) => {
+		const scope = await requireProductScope(ctx);
+		const name = args.name.trim();
+		if (!name) throw new Error("Composition name is required");
+		if (args.items.length === 0) {
+			throw new Error("Select at least one module to save a composition");
+		}
+
+		const product = await requireProductInScope(
+			ctx,
+			args.productId,
+			scope.organizationId,
+		);
+		if (!product.isComposition) {
+			throw new Error("Composition product not found");
+		}
+
+		const snapshotItems = await Promise.all(
+			args.items.map(async (item, position) => {
+				if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+					throw new Error("Quantity must be greater than zero");
+				}
+				const moduleProduct = await ctx.db.get(item.moduleProductId);
+				if (
+					!moduleProduct ||
+					moduleProduct.status === "deleted" ||
+					moduleProduct.parentId !== product._id ||
+					moduleProduct.organizationId !== scope.organizationId
+				) {
+					throw new Error("Selected module does not belong to this product");
+				}
+				const variant = await ctx.db.get(item.variantId);
+				if (!variant || variant.productId !== moduleProduct._id) {
+					throw new Error("Selected variant does not belong to this module");
+				}
+				return {
+					moduleProduct,
+					position,
+					quantity: Math.max(1, Math.floor(item.quantity)),
+					variant,
+				};
+			}),
+		);
+
+		const now = Date.now();
+		const compositionId = await ctx.db.insert("productCompositions", {
+			productId: product._id,
+			name,
+			notes: normalizeOptional(args.notes),
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await Promise.all(
+			snapshotItems.map(({ moduleProduct, position, quantity, variant }) =>
+				ctx.db.insert("productCompositionItems", {
+					compositionId,
+					moduleProductId: moduleProduct._id,
+					variantId: variant._id,
+					quantity,
+					position,
+					moduleName: moduleProduct.name,
+					moduleKind: moduleProduct.moduleKind ?? "component",
+					variantLabel: variant.variantLabel,
+					priceHt: variant.priceHt,
+					ecoParticipationHt: variant.ecoParticipationHt,
+					ecoParticipationTtc: variant.ecoParticipationTtc,
+					weightKg: variant.weightKg,
+					widthCm: variant.widthCm,
+					textileMode: variant.textileMode,
+					ecomaisonCode11:
+						variant.manualEcomaisonCode11 ?? variant.ecomaisonCode11,
+					createdAt: now,
+				}),
+			),
+		);
+
+		return compositionId;
+	},
+});
+
+/**
+ * Removes a saved composition configuration without deleting its modules.
+ */
+export const deleteProductComposition = mutation({
+	args: { compositionId: v.id("productCompositions") },
+	handler: async (ctx, args) => {
+		const scope = await requireProductScope(ctx);
+		const entry = await getCompositionInScope(
+			ctx,
+			args.compositionId,
+			scope.organizationId,
+		);
+		if (!entry) return null;
+		const items = await ctx.db
+			.query("productCompositionItems")
+			.withIndex("by_composition", (q) =>
+				q.eq("compositionId", args.compositionId),
+			)
+			.take(500);
+		await Promise.all(items.map((item) => ctx.db.delete(item._id)));
+		await ctx.db.delete(args.compositionId);
+		return null;
+	},
+});
 
 async function getShowroom(ctx: QueryOrMutationCtx) {
 	return await ctx.db
@@ -823,68 +946,11 @@ async function getOrCreateShowroom(ctx: MutationCtx, _now: number) {
 	return showroom;
 }
 
-async function seedExampleProducts(
-	ctx: MutationCtx,
-	showroomId: Id<"showrooms">,
-	userId: Id<"users">,
-	now: number,
-) {
-	const existing = await ctx.db
-		.query("products")
-		.withIndex("by_showroom", (q) => q.eq("showroomId", showroomId))
-		.take(1);
-	if (existing.length > 0) return;
-
-	for (const seed of seedProducts) {
-		const category = seed.category;
-		const family = getDefaultFamily(category);
-		const productId = await ctx.db.insert("products", {
-			name: seed.name,
-			molteniCategory: category,
-			ecomaisonFamily: family,
-			materialTier:
-				family === "Siège avec rembourrage" ? undefined : seed.materialTier,
-			zone: seed.zone,
-			hasRecyclingDisruptors: false,
-			sustainableCertified: false,
-			evolutionaryDesign: false,
-			isComposition: seed.isComposition ?? false,
-			showroomId,
-			notes: seed.notes,
-			status: "active",
-			tvaRate: 0.2,
-			createdByUserId: userId,
-			createdAt: now,
-			updatedAt: now,
-		});
-		const product = await ctx.db.get(productId);
-		const calculation = await calculateVariant(ctx, {
-			product,
-			weightKg: seed.weightKg,
-			widthCm: undefined,
-			textileMode: undefined,
-			tvaRate: 0.2,
-		});
-		await ctx.db.insert("productVariants", {
-			productId,
-			variantLabel: "Version showroom",
-			reference: seed.reference,
-			priceHt: seed.priceHt,
-			weightKg: seed.weightKg,
-			ecoParticipationHt: calculation?.ecoHt,
-			ecoParticipationTtc: calculation?.ecoTtc,
-			ecomaisonCode11: calculation?.officialProductCode,
-			isEcomaisonCodeManual: false,
-			createdAt: now,
-			updatedAt: now,
-		});
-	}
-}
-
 async function createBaseModule(
 	ctx: MutationCtx,
 	args: {
 		now: number;
+		organizationId: string;
 		parentProductId: Id<"products">;
 		showroomId: Id<"showrooms">;
 		source: {
@@ -927,6 +993,7 @@ async function createBaseModule(
 		moduleKind: "base",
 		parentId: args.parentProductId,
 		showroomId: args.showroomId,
+		organizationId: args.organizationId,
 		notes: "Base obligatoire de la composition.",
 		status: "active",
 		tvaRate: args.source.tvaRate,
@@ -1061,14 +1128,72 @@ async function calculateVariant(
 
 async function getActiveProducts(
 	ctx: QueryOrMutationCtx,
-	showroomId: Id<"showrooms">,
+	organizationId: string,
 ) {
 	return await ctx.db
 		.query("products")
-		.withIndex("by_showroom_and_status", (q) =>
-			q.eq("showroomId", showroomId).eq("status", "active"),
+		.withIndex("by_organization_and_status", (q) =>
+			q.eq("organizationId", organizationId).eq("status", "active"),
 		)
 		.take(500);
+}
+
+async function getFilteredProductCandidates(
+	ctx: QueryCtx,
+	args: {
+		category?: (typeof MOLTENI_CATEGORIES)[number];
+		organizationId: string;
+		zone?: (typeof ZONES)[number];
+	},
+) {
+	if (args.zone && args.category) {
+		const category = args.category;
+		const zone = args.zone;
+		return await ctx.db
+			.query("products")
+			.withIndex("by_organization_and_status_and_zone_and_category", (q) =>
+				q
+					.eq("organizationId", args.organizationId)
+					.eq("status", "active")
+					.eq("zone", zone)
+					.eq("molteniCategory", category),
+			)
+			.order("desc")
+			.take(PRODUCT_FILTER_READ_LIMIT);
+	}
+	if (args.zone) {
+		const zone = args.zone;
+		return await ctx.db
+			.query("products")
+			.withIndex("by_organization_and_status_and_zone", (q) =>
+				q
+					.eq("organizationId", args.organizationId)
+					.eq("status", "active")
+					.eq("zone", zone),
+			)
+			.order("desc")
+			.take(PRODUCT_FILTER_READ_LIMIT);
+	}
+	if (args.category) {
+		const category = args.category;
+		return await ctx.db
+			.query("products")
+			.withIndex("by_organization_and_status_and_category", (q) =>
+				q
+					.eq("organizationId", args.organizationId)
+					.eq("status", "active")
+					.eq("molteniCategory", category),
+			)
+			.order("desc")
+			.take(PRODUCT_FILTER_READ_LIMIT);
+	}
+	return await ctx.db
+		.query("products")
+		.withIndex("by_organization_and_status", (q) =>
+			q.eq("organizationId", args.organizationId).eq("status", "active"),
+		)
+		.order("desc")
+		.take(PRODUCT_FILTER_READ_LIMIT);
 }
 
 async function paginateActiveProducts(
@@ -1083,7 +1208,7 @@ async function paginateActiveProducts(
 			maximumRowsRead?: number;
 			maximumBytesRead?: number;
 		};
-		showroomId: Id<"showrooms">;
+		organizationId: string;
 		zone?: (typeof ZONES)[number];
 	},
 ) {
@@ -1091,9 +1216,9 @@ async function paginateActiveProducts(
 		const zone = args.zone;
 		return await ctx.db
 			.query("products")
-			.withIndex("by_showroom_and_status_and_zone", (q) =>
+			.withIndex("by_organization_and_status_and_zone", (q) =>
 				q
-					.eq("showroomId", args.showroomId)
+					.eq("organizationId", args.organizationId)
 					.eq("status", "active")
 					.eq("zone", zone),
 			)
@@ -1104,9 +1229,9 @@ async function paginateActiveProducts(
 		const category = args.category;
 		return await ctx.db
 			.query("products")
-			.withIndex("by_showroom_and_status_and_category", (q) =>
+			.withIndex("by_organization_and_status_and_category", (q) =>
 				q
-					.eq("showroomId", args.showroomId)
+					.eq("organizationId", args.organizationId)
 					.eq("status", "active")
 					.eq("molteniCategory", category),
 			)
@@ -1115,11 +1240,62 @@ async function paginateActiveProducts(
 	}
 	return await ctx.db
 		.query("products")
-		.withIndex("by_showroom_and_status", (q) =>
-			q.eq("showroomId", args.showroomId).eq("status", "active"),
+		.withIndex("by_organization_and_status", (q) =>
+			q.eq("organizationId", args.organizationId).eq("status", "active"),
 		)
 		.order("desc")
 		.paginate(args.paginationOpts);
+}
+
+async function getSavedCompositions(ctx: QueryCtx, productId: Id<"products">) {
+	const compositions = await ctx.db
+		.query("productCompositions")
+		.withIndex("by_product", (q) => q.eq("productId", productId))
+		.take(100);
+	const entries = await Promise.all(
+		compositions.map(async (composition) => {
+			const items = await ctx.db
+				.query("productCompositionItems")
+				.withIndex("by_composition", (q) =>
+					q.eq("compositionId", composition._id),
+				)
+				.take(200);
+			const sortedItems = items.sort(
+				(left, right) => left.position - right.position,
+			);
+			return {
+				_id: composition._id,
+				name: composition.name,
+				notes: composition.notes ?? null,
+				createdAt: composition.createdAt,
+				updatedAt: composition.updatedAt,
+				items: sortedItems.map((item) => ({
+					_id: item._id,
+					moduleProductId: item.moduleProductId,
+					variantId: item.variantId,
+					quantity: item.quantity,
+					position: item.position,
+					moduleName: item.moduleName,
+					moduleKind: item.moduleKind ?? "component",
+					variantLabel: item.variantLabel,
+					priceHt: item.priceHt ?? null,
+					ecoParticipationHt: item.ecoParticipationHt ?? null,
+					ecoParticipationTtc: item.ecoParticipationTtc ?? null,
+					weightKg: item.weightKg ?? null,
+					widthCm: item.widthCm ?? null,
+					textileMode: item.textileMode ?? null,
+					ecomaisonCode11: item.ecomaisonCode11 ?? null,
+				})),
+				totalEcoHt: sumKnown(
+					items.map((item) => (item.ecoParticipationHt ?? 0) * item.quantity),
+				),
+				totalEcoTtc: sumKnown(
+					items.map((item) => (item.ecoParticipationTtc ?? 0) * item.quantity),
+				),
+			};
+		}),
+	);
+	return entries.sort((left, right) => right.createdAt - left.createdAt);
 }
 
 async function getVariantsForProducts(
@@ -1141,6 +1317,7 @@ async function getVariantsForProducts(
 async function getParentNames(
 	ctx: QueryOrMutationCtx,
 	products: Doc<"products">[],
+	organizationId: string,
 ) {
 	const parentIds = Array.from(
 		new Set(products.map((product) => product.parentId).filter(Boolean)),
@@ -1148,7 +1325,9 @@ async function getParentNames(
 	const entries = await Promise.all(
 		parentIds.map(async (parentId) => {
 			const parent = await ctx.db.get(parentId);
-			return [parentId, parent?.name ?? null] as const;
+			const parentName =
+				parent?.organizationId === organizationId ? parent.name : null;
+			return [parentId, parentName] as const;
 		}),
 	);
 	return new Map(entries);
@@ -1323,6 +1502,30 @@ function matchesStatus(
 ) {
 	if (!status || status === "all") return true;
 	return row.status === status;
+}
+
+function normalizePage(value: number) {
+	if (!Number.isFinite(value)) return 0;
+	return Math.max(0, Math.floor(value));
+}
+
+function normalizePageSize(value: number) {
+	if (!Number.isFinite(value)) return 50;
+	return Math.min(MAX_PRODUCT_PAGE_SIZE, Math.max(1, Math.floor(value)));
+}
+
+function emptyProductPage(page: number, pageSize: number) {
+	return {
+		rows: [],
+		page,
+		pageSize,
+		totalCount: 0,
+		totalPages: 1,
+		startIndex: 0,
+		endIndex: 0,
+		hasPreviousPage: false,
+		hasNextPage: false,
+	};
 }
 
 function normalizeOptional(value: string | undefined) {

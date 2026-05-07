@@ -1997,6 +1997,13 @@ const categoryOptions: ChoiceOption<MolteniCategory>[] = [
 		icon: Table2,
 	},
 	{
+		value: "Bureau",
+		label: "Bureau",
+		description:
+			"Famille Meuble. Ecomaison le rapproche de bureau, table, plan de travail.",
+		icon: Table2,
+	},
+	{
 		value: "Table basse",
 		label: "Table basse",
 		description:

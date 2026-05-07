@@ -90,6 +90,116 @@ export const { onCreate, onUpdate, onDelete } = authComponent.triggersApi();
 // Client API exports — required by the component for auth queries
 export const { getAuthUser } = authComponent.clientApi();
 
+type BetterAuthModel = "organization" | "session" | "member";
+
+type BetterAuthWhere = {
+	connector?: "AND" | "OR";
+	field: string;
+	operator?:
+		| "lt"
+		| "lte"
+		| "gt"
+		| "gte"
+		| "eq"
+		| "in"
+		| "not_in"
+		| "ne"
+		| "contains"
+		| "starts_with"
+		| "ends_with";
+	value: string | number | boolean | string[] | number[] | null;
+};
+
+type BetterAuthPaginationResult = {
+	page?: unknown[];
+};
+
+export type BetterAuthDocument = Record<string, unknown>;
+
+export async function findBetterAuthOne(
+	ctx: GenericCtx<DataModel>,
+	args: {
+		model: BetterAuthModel;
+		where?: BetterAuthWhere[];
+		select?: string[];
+	},
+) {
+	const document: unknown = await ctx.runQuery(betterAuthRef.adapter.findOne, {
+		model: args.model,
+		select: args.select,
+		where: args.where,
+	});
+	return asBetterAuthDocument(document);
+}
+
+export async function findBetterAuthMany(
+	ctx: GenericCtx<DataModel>,
+	args: {
+		limit: number;
+		model: BetterAuthModel;
+		sortBy?: { direction: "asc" | "desc"; field: string };
+		where?: BetterAuthWhere[];
+		select?: string[];
+	},
+) {
+	const result: unknown = await ctx.runQuery(betterAuthRef.adapter.findMany, {
+		model: args.model,
+		paginationOpts: { cursor: null, numItems: args.limit },
+		select: args.select,
+		sortBy: args.sortBy,
+		where: args.where,
+	});
+	const page = asPaginationResult(result).page ?? [];
+	return page.flatMap((document) => {
+		const record = asBetterAuthDocument(document);
+		return record ? [record] : [];
+	});
+}
+
+export async function getActiveOrganizationId(ctx: GenericCtx<DataModel>) {
+	const identity = await ctx.auth.getUserIdentity();
+	if (!identity) return null;
+
+	const session = await findBetterAuthOne(ctx, {
+		model: "session",
+		where: [
+			{ field: "_id", value: identity.sessionId as string },
+			{ field: "expiresAt", operator: "gt", value: Date.now() },
+		],
+	});
+	const activeOrganizationId = readBetterAuthString(
+		session,
+		"activeOrganizationId",
+	);
+	return activeOrganizationId?.trim() || null;
+}
+
+export async function requireActiveOrganizationId(ctx: GenericCtx<DataModel>) {
+	const organizationId = await getActiveOrganizationId(ctx);
+	if (!organizationId) throw new Error("No active organization selected");
+	return organizationId;
+}
+
+export function readBetterAuthString(
+	document: BetterAuthDocument | null,
+	field: string,
+) {
+	const value = document?.[field];
+	return typeof value === "string" ? value : null;
+}
+
+function asBetterAuthDocument(value: unknown) {
+	return value && typeof value === "object"
+		? (value as BetterAuthDocument)
+		: null;
+}
+
+function asPaginationResult(value: unknown): BetterAuthPaginationResult {
+	return value && typeof value === "object"
+		? (value as BetterAuthPaginationResult)
+		: {};
+}
+
 // Better Auth options factory (used by adapter and schema generation)
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 	({

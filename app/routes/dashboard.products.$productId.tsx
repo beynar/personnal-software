@@ -31,6 +31,16 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -94,6 +104,7 @@ type ProductDetail = {
 	variants: ProductVariantRow[];
 	baseModule?: ModuleRow | null;
 	modules: ModuleRow[];
+	savedCompositions?: SavedComposition[];
 	totalEcoHt?: number | null;
 	totalEcoTtc?: number | null;
 };
@@ -129,6 +140,35 @@ type ProductVariantRow = {
 	ecoParticipationTtc?: number | null;
 	ecomaisonCode11?: string | null;
 	manualEcomaisonCode11?: string | null;
+};
+
+type SavedComposition = {
+	_id: string;
+	name: string;
+	notes?: string | null;
+	createdAt: number;
+	updatedAt: number;
+	totalEcoHt?: number | null;
+	totalEcoTtc?: number | null;
+	items: SavedCompositionItem[];
+};
+
+type SavedCompositionItem = {
+	_id: string;
+	moduleProductId: string;
+	variantId: string;
+	quantity: number;
+	position: number;
+	moduleName: string;
+	moduleKind?: "base" | "component" | null;
+	variantLabel: string;
+	priceHt?: number | null;
+	ecoParticipationHt?: number | null;
+	ecoParticipationTtc?: number | null;
+	weightKg?: number | null;
+	widthCm?: number | null;
+	textileMode?: string | null;
+	ecomaisonCode11?: string | null;
 };
 
 type ModuleRow = {
@@ -204,6 +244,19 @@ type ModuleVariantSelection = Record<
 	}
 >;
 
+type CompositionItemDraft = {
+	moduleProductId: string;
+	variantId: string;
+	quantity: number;
+};
+
+type DeleteDialogState = {
+	title: string;
+	description: string;
+	confirmLabel: string;
+	onConfirm: () => Promise<void>;
+};
+
 export const Route = createFileRoute("/dashboard/products/$productId")({
 	loader: async ({ context, params }) => {
 		const product = await context.getOrpc().molteni.product({
@@ -234,6 +287,12 @@ function ProductDetailPage() {
 	const deleteVariant = useMutation(api.products.deleteVariant);
 	const setManualCode = useMutation(api.products.setManualEcomaisonCode);
 	const softDeleteProduct = useMutation(api.products.softDeleteProduct);
+	const createProductComposition = useMutation(
+		api.products.createProductComposition,
+	);
+	const deleteProductComposition = useMutation(
+		api.products.deleteProductComposition,
+	);
 	const [productDialogOpen, setProductDialogOpen] = useState(false);
 	const [productForm, setProductForm] = useState<ProductEditFormState>(() =>
 		productEditForm(detail?.product),
@@ -252,6 +311,11 @@ function ProductDetailPage() {
 	const [selectedBaseVariantId, setSelectedBaseVariantId] = useState<
 		string | null
 	>(null);
+	const [compositionName, setCompositionName] = useState("");
+	const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(
+		null,
+	);
+	const [confirmingDeletion, setConfirmingDeletion] = useState(false);
 	const [manualCode, setManualCodeValue] = useState(
 		primaryManualCode(detail?.variants[0]) ?? "",
 	);
@@ -269,6 +333,7 @@ function ProductDetailPage() {
 	const product = detail.product;
 	const baseModule = detail.baseModule ?? null;
 	const modules = detail.modules;
+	const savedCompositions = detail.savedCompositions ?? [];
 	const primaryVariant = detail.variants[0] ?? null;
 	const currentCode =
 		primaryVariant?.manualEcomaisonCode11 ??
@@ -388,9 +453,54 @@ function ProductDetailPage() {
 		await router.invalidate();
 	}
 
-	async function handleVariantDelete(variant: ProductVariantRow) {
-		const confirmed = window.confirm("Supprimer cette variante ?");
-		if (!confirmed) return;
+	function handleVariantDelete(variant: ProductVariantRow) {
+		setDeleteDialog({
+			title: "Supprimer cette variante ?",
+			description:
+				"La variante sera retirée de ce produit. Cette action ne supprime pas le produit.",
+			confirmLabel: "Supprimer la variante",
+			onConfirm: () => deleteVariantRow(variant),
+		});
+	}
+
+	async function confirmDeleteDialog() {
+		if (!deleteDialog) return;
+		setConfirmingDeletion(true);
+		try {
+			await deleteDialog.onConfirm();
+			setDeleteDialog(null);
+		} finally {
+			setConfirmingDeletion(false);
+		}
+	}
+
+	async function deleteProductAndLeaveDetail() {
+		await softDeleteProduct({ productId: product._id as Id<"products"> });
+		toast.success("Produit supprimé");
+		await navigate({
+			params: product.parentId ? { productId: product.parentId } : undefined,
+			to: product.parentId
+				? "/dashboard/products/$productId"
+				: "/dashboard/products",
+			viewTransition: true,
+		});
+	}
+
+	async function deleteModule(module: ModuleRow) {
+		await softDeleteProduct({ productId: module._id as Id<"products"> });
+		toast.success("Module supprimé");
+		await router.invalidate();
+	}
+
+	async function deleteSavedComposition(composition: SavedComposition) {
+		await deleteProductComposition({
+			compositionId: composition._id as Id<"productCompositions">,
+		});
+		toast.success("Composition supprimée");
+		await router.invalidate();
+	}
+
+	async function deleteVariantRow(variant: ProductVariantRow) {
 		await deleteVariant({ variantId: variant._id as Id<"productVariants"> });
 		toast.success("Variante supprimée");
 		await router.invalidate();
@@ -450,10 +560,44 @@ function ProductDetailPage() {
 	}
 
 	function openComposeDialog() {
-		const baseVariant = baseModule ? getModuleVariants(baseModule)[0] : null;
-		setSelectedBaseVariantId(baseVariant?._id ?? null);
+		setCompositionName("");
+		setSelectedBaseVariantId(null);
 		setSelectedModuleVariants(getDefaultModuleVariantSelection(modules));
 		setComposeDialogOpen(true);
+	}
+
+	async function handleSaveComposition(items: CompositionItemDraft[]) {
+		if (!compositionName.trim()) {
+			toast.error("Le nom de la composition est obligatoire.");
+			return;
+		}
+		if (items.length === 0) {
+			toast.error("Sélectionnez au moins un module.");
+			return;
+		}
+		await createProductComposition({
+			productId: product._id as Id<"products">,
+			name: compositionName,
+			items: items.map((item) => ({
+				moduleProductId: item.moduleProductId as Id<"products">,
+				variantId: item.variantId as Id<"productVariants">,
+				quantity: item.quantity,
+			})),
+		});
+		toast.success("Composition enregistrée");
+		setComposeDialogOpen(false);
+		setCompositionName("");
+		await router.invalidate();
+	}
+
+	function handleSavedCompositionDelete(composition: SavedComposition) {
+		setDeleteDialog({
+			title: "Supprimer cette composition enregistrée ?",
+			description:
+				"La composition sauvegardée sera supprimée. Les modules et la base restent inchangés.",
+			confirmLabel: "Supprimer la composition",
+			onConfirm: () => deleteSavedComposition(composition),
+		});
 	}
 
 	async function handleManualCodeSave() {
@@ -466,28 +610,24 @@ function ProductDetailPage() {
 		await router.invalidate();
 	}
 
-	async function handleDelete() {
-		const confirmed = window.confirm(
-			"Supprimer ce produit ? Il disparaîtra de l’inventaire actif.",
-		);
-		if (!confirmed) return;
-		await softDeleteProduct({ productId: product._id as Id<"products"> });
-		toast.success("Produit supprimé");
-		await navigate({
-			params: product.parentId ? { productId: product.parentId } : undefined,
-			to: product.parentId
-				? "/dashboard/products/$productId"
-				: "/dashboard/products",
-			viewTransition: true,
+	function handleDelete() {
+		setDeleteDialog({
+			title: "Supprimer ce produit ?",
+			description:
+				"Le produit disparaîtra de l’inventaire actif. Les données ne seront plus affichées dans la liste produits.",
+			confirmLabel: "Supprimer le produit",
+			onConfirm: deleteProductAndLeaveDetail,
 		});
 	}
 
-	async function handleModuleDelete(module: ModuleRow) {
-		const confirmed = window.confirm("Supprimer ce module ?");
-		if (!confirmed) return;
-		await softDeleteProduct({ productId: module._id as Id<"products"> });
-		toast.success("Module supprimé");
-		await router.invalidate();
+	function handleModuleDelete(module: ModuleRow) {
+		setDeleteDialog({
+			title: "Supprimer ce module ?",
+			description:
+				"Le module sera retiré de la composition. Les compositions enregistrées gardent leurs snapshots existants.",
+			confirmLabel: "Supprimer le module",
+			onConfirm: () => deleteModule(module),
+		});
 	}
 
 	return (
@@ -748,6 +888,13 @@ function ProductDetailPage() {
 				)}
 			</div>
 
+			{product.isComposition ? (
+				<SavedCompositionsSection
+					compositions={savedCompositions}
+					onDelete={handleSavedCompositionDelete}
+				/>
+			) : null}
+
 			<ProductEditDialog
 				form={productForm}
 				isComposition={product.isComposition}
@@ -772,14 +919,50 @@ function ProductDetailPage() {
 			/>
 			<ComposeProductDialog
 				baseModule={baseModule}
+				compositionName={compositionName}
 				modules={modules}
 				onBaseVariantChange={setSelectedBaseVariantId}
 				onOpenChange={setComposeDialogOpen}
+				onSave={handleSaveComposition}
+				onCompositionNameChange={setCompositionName}
 				onSelectionChange={setSelectedModuleVariants}
 				open={composeDialogOpen}
 				selectedBaseVariantId={selectedBaseVariantId}
 				selectedModuleVariants={selectedModuleVariants}
 			/>
+			<AlertDialog
+				onOpenChange={(open) => {
+					if (!open && !confirmingDeletion) setDeleteDialog(null);
+				}}
+				open={deleteDialog !== null}
+			>
+				<AlertDialogContent size="sm">
+					<AlertDialogHeader>
+						<AlertDialogTitle>{deleteDialog?.title}</AlertDialogTitle>
+						<AlertDialogDescription>
+							{deleteDialog?.description}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={confirmingDeletion}>
+							Annuler
+						</AlertDialogCancel>
+						<AlertDialogAction
+							className="whitespace-normal text-center leading-tight"
+							disabled={confirmingDeletion}
+							onClick={(event) => {
+								event.preventDefault();
+								void confirmDeleteDialog();
+							}}
+							variant="destructive"
+						>
+							{confirmingDeletion
+								? "Suppression..."
+								: (deleteDialog?.confirmLabel ?? "Supprimer")}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }
@@ -957,6 +1140,104 @@ function ModulesSection({
 						Aucun module pour le moment. Ajoutez chaque élément séparément ; le
 						total de la composition sera calculé à partir des éco-participations
 						des modules.
+					</p>
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function SavedCompositionsSection({
+	compositions,
+	onDelete,
+}: {
+	compositions: SavedComposition[];
+	onDelete: (composition: SavedComposition) => void;
+}) {
+	return (
+		<Card className="border-border/70">
+			<CardHeader>
+				<CardTitle>Compositions enregistrées</CardTitle>
+				<CardDescription>
+					Configurations sauvegardées avec leurs modules, variantes et
+					quantités.
+				</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-3">
+				{compositions.length > 0 ? (
+					compositions.map((composition) => (
+						<div className="border border-border p-3" key={composition._id}>
+							<div className="flex flex-wrap items-start justify-between gap-3">
+								<div className="min-w-0">
+									<p className="font-serif text-lg leading-tight">
+										{composition.name}
+									</p>
+									<p className="mt-1 text-muted-foreground text-sm">
+										{composition.items.length} module
+										{composition.items.length > 1 ? "s" : ""} · Éco-part TTC{" "}
+										<span className="font-medium text-foreground">
+											{formatEuro(composition.totalEcoTtc ?? null)}
+										</span>{" "}
+										/ HT{" "}
+										<span className="font-medium text-foreground">
+											{formatEuro(composition.totalEcoHt ?? null)}
+										</span>
+									</p>
+								</div>
+								<Button
+									onClick={() => onDelete(composition)}
+									type="button"
+									variant="destructive"
+								>
+									<Trash2 className="size-4" />
+									Supprimer
+								</Button>
+							</div>
+							<div className="mt-3 space-y-1.5">
+								{composition.items.map((item) => {
+									const itemEcoHt =
+										item.ecoParticipationHt == null
+											? null
+											: item.ecoParticipationHt * item.quantity;
+									const itemEcoTtc =
+										item.ecoParticipationTtc == null
+											? null
+											: item.ecoParticipationTtc * item.quantity;
+									return (
+										<div
+											className="grid items-center gap-2 border border-border/70 bg-muted/25 px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto]"
+											key={item._id}
+										>
+											<div>
+												<p className="font-medium">
+													{item.moduleName}
+													{item.moduleKind === "base" ? " · Base" : ""}
+												</p>
+												<p className="text-muted-foreground">
+													{item.variantLabel} · {formatVariantMeasure(item)}
+												</p>
+											</div>
+											<div className="text-right leading-tight">
+												<p className="font-medium">
+													Qté {item.quantity} · Éco-part TTC{" "}
+													<span className="font-medium">
+														{formatEuro(itemEcoTtc)}
+													</span>
+												</p>
+												<p className="text-muted-foreground">
+													Éco-part HT {formatEuro(itemEcoHt)}
+												</p>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						</div>
+					))
+				) : (
+					<p className="text-muted-foreground text-sm">
+						Aucune composition enregistrée. Utilisez “Composer le produit” pour
+						sauvegarder une configuration.
 					</p>
 				)}
 			</CardContent>
@@ -1308,32 +1589,34 @@ function ProductEditDialog({
 
 function ComposeProductDialog({
 	baseModule,
+	compositionName,
 	modules,
 	onBaseVariantChange,
+	onCompositionNameChange,
 	onOpenChange,
+	onSave,
 	onSelectionChange,
 	open,
 	selectedBaseVariantId,
 	selectedModuleVariants,
 }: {
 	baseModule?: ModuleRow | null;
+	compositionName: string;
 	modules: ModuleRow[];
 	onBaseVariantChange: (variantId: string | null) => void;
+	onCompositionNameChange: (name: string) => void;
 	onOpenChange: (open: boolean) => void;
+	onSave: (items: CompositionItemDraft[]) => void;
 	onSelectionChange: (selection: ModuleVariantSelection) => void;
 	open: boolean;
 	selectedBaseVariantId: string | null;
 	selectedModuleVariants: ModuleVariantSelection;
 }) {
 	const baseVariants = baseModule ? getModuleVariants(baseModule) : [];
-	const baseVariant = baseModule
-		? (getSelectedModuleVariant(
-				baseModule,
-				selectedBaseVariantId ?? undefined,
-			) ??
-			baseVariants[0] ??
-			null)
-		: null;
+	const baseVariant =
+		baseModule && selectedBaseVariantId
+			? getSelectedModuleVariant(baseModule, selectedBaseVariantId)
+			: null;
 	const selectedVariants = modules
 		.map((module) => {
 			const selection = selectedModuleVariants[module._id];
@@ -1390,11 +1673,45 @@ function ComposeProductDialog({
 	}
 
 	function selectAll() {
+		if (baseModule) {
+			onBaseVariantChange(getModuleVariants(baseModule)[0]?._id ?? null);
+		}
 		onSelectionChange(getDefaultModuleVariantSelection(modules));
 	}
 
 	function clearSelection() {
+		onBaseVariantChange(null);
 		onSelectionChange({});
+	}
+
+	function toggleBase() {
+		if (selectedBaseVariantId) {
+			onBaseVariantChange(null);
+			return;
+		}
+		onBaseVariantChange(baseVariants[0]?._id ?? null);
+	}
+
+	function saveComposition() {
+		const items: CompositionItemDraft[] = [];
+		if (baseModule && baseVariant) {
+			items.push({
+				moduleProductId: baseModule._id,
+				variantId: baseVariant._id,
+				quantity: 1,
+			});
+		}
+		for (const module of modules) {
+			const selection = selectedModuleVariants[module._id];
+			const variant = getSelectedModuleVariant(module, selection?.variantId);
+			if (!selection || !variant) continue;
+			items.push({
+				moduleProductId: module._id,
+				variantId: variant._id,
+				quantity: selection.quantity,
+			});
+		}
+		onSave(items);
 	}
 
 	return (
@@ -1408,10 +1725,17 @@ function ComposeProductDialog({
 					</DialogDescription>
 				</DialogHeader>
 				<div className="space-y-4">
+					<Field label="Nom de la composition">
+						<Input
+							onChange={(event) => onCompositionNameChange(event.target.value)}
+							placeholder="Ex. Configuration 3 places"
+							value={compositionName}
+						/>
+					</Field>
 					<div className="flex flex-wrap items-center justify-between gap-3 border border-border p-4">
 						<div>
 							<p className="text-muted-foreground text-sm">
-								Base obligatoire + modules sélectionnés
+								Modules sélectionnés
 							</p>
 							<p className="font-serif text-4xl">{formatEuro(totalHt)}</p>
 							<p className="text-muted-foreground text-sm">
@@ -1432,23 +1756,23 @@ function ComposeProductDialog({
 							<div className="grid min-h-16 items-center gap-4 border border-primary/60 bg-primary/10 p-3 sm:grid-cols-[minmax(0,1fr)_220px_minmax(120px,auto)]">
 								<div className="flex items-center gap-3">
 									<input
-										checked
+										checked={Boolean(selectedBaseVariantId)}
 										className="size-4 bg-input/40 accent-primary"
-										disabled
-										readOnly
+										onChange={toggleBase}
 										type="checkbox"
 									/>
 									<span>
 										<span className="block font-medium">{baseModule.name}</span>
 										<span className="mt-1 block text-muted-foreground text-sm">
-											Base obligatoire · {baseModule.molteniCategory}
+											Base / structure · {baseModule.molteniCategory}
 										</span>
 									</span>
 								</div>
 								{baseVariants.length > 1 ? (
 									<Select
+										disabled={!selectedBaseVariantId}
 										onValueChange={onBaseVariantChange}
-										value={baseVariant?._id ?? baseVariants[0]._id}
+										value={selectedBaseVariantId ?? baseVariants[0]._id}
 									>
 										<SelectTrigger className="w-full">
 											<SelectValue />
@@ -1462,9 +1786,7 @@ function ComposeProductDialog({
 										</SelectContent>
 									</Select>
 								) : (
-									<span className="text-muted-foreground text-sm">
-										{baseVariant?.variantLabel ?? "Base à compléter"}
-									</span>
+									<span aria-hidden="true" />
 								)}
 								<span className="shrink-0 self-center text-right leading-tight">
 									<span className="block font-medium">
@@ -1609,6 +1931,13 @@ function ComposeProductDialog({
 					</div>
 				</div>
 				<DialogFooter>
+					<Button
+						disabled={!compositionName.trim()}
+						onClick={saveComposition}
+						type="button"
+					>
+						Enregistrer la composition
+					</Button>
 					<Button onClick={() => onOpenChange(false)} type="button">
 						Fermer
 					</Button>
@@ -2100,7 +2429,7 @@ function categoryIcon(category: string) {
 	if (category === "Cuisine") return ChefHat;
 	if (category === "Bibliothèque") return BookOpen;
 	if (category === "Dressing") return Boxes;
-	if (category.includes("Table")) return Table2;
+	if (category.includes("Table") || category === "Bureau") return Table2;
 	if (category === "Banc") return Ruler;
 	return Weight;
 }

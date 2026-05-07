@@ -46,6 +46,7 @@ const schema = defineSchema({
 		moduleKind: v.optional(v.union(v.literal("base"), v.literal("component"))),
 		parentId: v.optional(v.id("products")),
 		showroomId: v.id("showrooms"),
+		organizationId: v.optional(v.string()),
 		notes: v.optional(v.string()),
 		status: v.string(),
 		soldDate: v.optional(v.string()),
@@ -57,8 +58,31 @@ const schema = defineSchema({
 		.index("by_showroom", ["showroomId"])
 		.index("by_showroom_and_status", ["showroomId", "status"])
 		.index("by_showroom_and_status_and_zone", ["showroomId", "status", "zone"])
+		.index("by_showroom_and_status_and_zone_and_category", [
+			"showroomId",
+			"status",
+			"zone",
+			"molteniCategory",
+		])
 		.index("by_showroom_and_status_and_category", [
 			"showroomId",
+			"status",
+			"molteniCategory",
+		])
+		.index("by_organization_and_status", ["organizationId", "status"])
+		.index("by_organization_and_status_and_zone", [
+			"organizationId",
+			"status",
+			"zone",
+		])
+		.index("by_organization_and_status_and_zone_and_category", [
+			"organizationId",
+			"status",
+			"zone",
+			"molteniCategory",
+		])
+		.index("by_organization_and_status_and_category", [
+			"organizationId",
 			"status",
 			"molteniCategory",
 		])
@@ -66,7 +90,7 @@ const schema = defineSchema({
 		.index("by_showroom_and_category", ["showroomId", "molteniCategory"])
 		.searchIndex("search_name", {
 			searchField: "name",
-			filterFields: ["showroomId", "status"],
+			filterFields: ["showroomId", "organizationId", "status"],
 		}),
 	productVariants: defineTable({
 		productId: v.id("products"),
@@ -85,6 +109,31 @@ const schema = defineSchema({
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	}).index("by_product", ["productId"]),
+	productCompositions: defineTable({
+		productId: v.id("products"),
+		name: v.string(),
+		notes: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	}).index("by_product", ["productId"]),
+	productCompositionItems: defineTable({
+		compositionId: v.id("productCompositions"),
+		moduleProductId: v.id("products"),
+		variantId: v.id("productVariants"),
+		quantity: v.number(),
+		position: v.number(),
+		moduleName: v.string(),
+		moduleKind: v.optional(v.union(v.literal("base"), v.literal("component"))),
+		variantLabel: v.string(),
+		priceHt: v.optional(v.number()),
+		ecoParticipationHt: v.optional(v.number()),
+		ecoParticipationTtc: v.optional(v.number()),
+		weightKg: v.optional(v.number()),
+		widthCm: v.optional(v.number()),
+		textileMode: v.optional(v.string()),
+		ecomaisonCode11: v.optional(v.string()),
+		createdAt: v.number(),
+	}).index("by_composition", ["compositionId"]),
 	ecomaisonCodeMappings: defineTable({
 		segment: v.string(),
 		key: v.string(),

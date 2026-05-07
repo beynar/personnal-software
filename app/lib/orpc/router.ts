@@ -59,15 +59,6 @@ export const apiRouter = {
 			}),
 	},
 	molteni: {
-		bootstrap: orpc.molteni.bootstrap
-			.use(({ context, next }) => {
-				requireAuth(context);
-				return next({ context });
-			})
-			.handler(async () => {
-				await fetchAuthMutation(api.products.ensureSeedData);
-				return { ok: true };
-			}),
 		dashboard: orpc.molteni.dashboard
 			.use(({ context, next }) => {
 				requireAuth(context);

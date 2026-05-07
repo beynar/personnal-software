@@ -1,11 +1,11 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { usePaginatedQuery } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { Search } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { PaginationControls } from "~/components/ui/pagination";
 import {
 	Select,
 	SelectContent,
@@ -22,6 +22,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "~/components/ui/table";
+import { cn } from "~/lib/utils";
 import { api } from "../../convex/_generated/api";
 import {
 	MOLTENI_CATEGORIES,
@@ -54,6 +55,17 @@ type ProductTypeFilter = "all" | "standalone" | "composition" | "module";
 type ProductStatusFilter = "all" | "calculated" | "incomplete" | "sold";
 type ZoneFilter = "all" | (typeof ZONES)[number];
 type CategoryFilter = "all" | (typeof MOLTENI_CATEGORIES)[number];
+type ProductPage = {
+	rows: ProductRow[];
+	page: number;
+	pageSize: number;
+	totalCount: number;
+	totalPages: number;
+	startIndex: number;
+	endIndex: number;
+	hasPreviousPage: boolean;
+	hasNextPage: boolean;
+};
 
 export const Route = createFileRoute("/dashboard/products/")({
 	staticData: {
@@ -68,34 +80,47 @@ export const Route = createFileRoute("/dashboard/products/")({
 
 function ProductsPage() {
 	const navigate = useNavigate();
+	const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
 	const [search, setSearch] = useState("");
 	const [zone, setZone] = useState<ZoneFilter>("all");
 	const [category, setCategory] = useState<CategoryFilter>("all");
 	const [type, setType] = useState<ProductTypeFilter>("all");
 	const [status, setStatus] = useState<ProductStatusFilter>("all");
-	const products = usePaginatedQuery(
-		api.products.listProductsPaginated,
-		{
-			category,
-			search: search.trim() || undefined,
-			status,
-			type,
-			zone,
-		},
-		{ initialNumItems: 12 },
-	);
-	const rows = products.results as ProductRow[];
-	const isInitialLoading = products.status === "LoadingFirstPage";
+	const [page, setPage] = useState(0);
+	const [pageSize, setPageSize] = useState(50);
+	const productsPage = useQuery(
+		api.products.listProductsPage,
+		isAuthenticated
+			? {
+					category,
+					page,
+					pageSize,
+					search: search.trim() || undefined,
+					status,
+					type,
+					zone,
+				}
+			: "skip",
+	) as ProductPage | undefined;
+	const rows = productsPage?.rows ?? [];
+	const isInitialLoading = isAuthLoading || productsPage === undefined;
+
+	function resetPage() {
+		setPage(0);
+	}
 
 	return (
-		<div className="space-y-4">
-			<div className="space-y-3">
+		<div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
+			<div className="shrink-0 space-y-3">
 				<div className="relative">
 					<Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-3 size-4 text-muted-foreground" />
 					<Input
 						aria-label="Rechercher des produits"
 						className="pl-9"
-						onChange={(event) => setSearch(event.target.value)}
+						onChange={(event) => {
+							setSearch(event.target.value);
+							resetPage();
+						}}
 						placeholder="Rechercher un nom ou une référence"
 						value={search}
 					/>
@@ -105,138 +130,158 @@ function ProductsPage() {
 						label="Zone"
 						options={zoneFilterOptions}
 						value={zone}
-						onChange={(value) => setZone(value as ZoneFilter)}
+						onChange={(value) => {
+							setZone(value as ZoneFilter);
+							resetPage();
+						}}
 					/>
 					<FilterSelect
 						label="Type"
 						options={typeFilterOptions}
 						value={type}
-						onChange={(value) => setType(value as ProductTypeFilter)}
+						onChange={(value) => {
+							setType(value as ProductTypeFilter);
+							resetPage();
+						}}
 					/>
 					<FilterSelect
 						label="État"
 						options={statusFilterOptions}
 						value={status}
-						onChange={(value) => setStatus(value as ProductStatusFilter)}
+						onChange={(value) => {
+							setStatus(value as ProductStatusFilter);
+							resetPage();
+						}}
 					/>
 					<FilterSelect
 						label="Catégorie"
 						options={categoryFilterOptions}
 						value={category}
-						onChange={(value) => setCategory(value as CategoryFilter)}
+						onChange={(value) => {
+							setCategory(value as CategoryFilter);
+							resetPage();
+						}}
 					/>
 				</div>
 			</div>
 
-			<Card className="border-border/70">
-				<CardContent className="p-0">
-					{isInitialLoading ? (
-						<ProductsSkeleton />
-					) : (
-						<>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>État</TableHead>
-										<TableHead>Produit</TableHead>
-										<TableHead>Zone</TableHead>
-										<TableHead>Catégorie</TableHead>
-										<TableHead>Type</TableHead>
-										<TableHead>Poids</TableHead>
-										<TableHead>Prix TTC / HT</TableHead>
-										<TableHead>Éco TTC / HT</TableHead>
-										<TableHead>Données</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{rows.map((product) => (
-										<TableRow
-											className="cursor-pointer"
-											key={product._id}
-											onClick={() =>
-												void navigate({
-													params: { productId: product._id },
-													to: "/dashboard/products/$productId",
-													viewTransition: true,
-												})
-											}
-											onKeyDown={(event) => {
-												if (event.key !== "Enter" && event.key !== " ") return;
-												event.preventDefault();
-												void navigate({
-													params: { productId: product._id },
-													to: "/dashboard/products/$productId",
-													viewTransition: true,
-												});
-											}}
-											tabIndex={0}
-										>
-											<TableCell className="align-middle">
-												<span
-													className={`mx-auto block size-2.5 rounded-full ${dotClass(product.status)}`}
-												/>
-											</TableCell>
-											<TableCell>
-												<Link
-													className="font-medium hover:underline"
-													params={{ productId: product._id }}
-													to="/dashboard/products/$productId"
-													viewTransition
-												>
-													{product.name}
-												</Link>
-												<p className="text-sm text-muted-foreground">
-													{product.variantCount} variante
-													{product.variantCount > 1 ? "s" : ""}
-												</p>
-											</TableCell>
-											<TableCell>{product.zone ?? "-"}</TableCell>
-											<TableCell>{product.molteniCategory}</TableCell>
-											<TableCell>
-												{getProductTypeLabel({
-													isComposition: product.isComposition,
-													parentId: product.parentId,
-												})}
-												{product.parentName ? (
-													<p className="text-xs text-muted-foreground">
-														{product.parentName}
+			<div className="relative min-h-0 flex-1 overflow-hidden pb-28 md:pb-16">
+				<Card className="max-h-full overflow-auto overscroll-contain border-border/70">
+					<CardContent className="p-0">
+						{isInitialLoading ? (
+							<ProductsTableSkeleton />
+						) : (
+							<>
+								<Table containerClassName="contents">
+									<ProductTableHeader />
+									<TableBody>
+										{rows.map((product) => (
+											<TableRow
+												className="cursor-pointer"
+												key={product._id}
+												onClick={() =>
+													void navigate({
+														params: { productId: product._id },
+														to: "/dashboard/products/$productId",
+														viewTransition: true,
+													})
+												}
+												onKeyDown={(event) => {
+													if (event.key !== "Enter" && event.key !== " ")
+														return;
+													event.preventDefault();
+													void navigate({
+														params: { productId: product._id },
+														to: "/dashboard/products/$productId",
+														viewTransition: true,
+													});
+												}}
+												tabIndex={0}
+											>
+												<TableCell className="align-middle">
+													<span
+														className={`mx-auto block size-2.5 rounded-full ${dotClass(product.status)}`}
+													/>
+												</TableCell>
+												<TableCell>
+													<Link
+														className="font-medium hover:underline"
+														params={{ productId: product._id }}
+														to="/dashboard/products/$productId"
+														viewTransition
+													>
+														{product.name}
+													</Link>
+													<p className="text-sm text-muted-foreground">
+														{product.variantCount} variante
+														{product.variantCount > 1 ? "s" : ""}
 													</p>
-												) : null}
-											</TableCell>
-											<TableCell>
-												{product.weightKg === null
-													? "-"
-													: `${product.weightKg} kg`}
-											</TableCell>
-											<TableCell>
-												<MoneyPair
-													ht={product.priceHt}
-													ttc={calculateTtc(product.priceHt, product.tvaRate)}
-												/>
-											</TableCell>
-											<TableCell>
-												<MoneyPair
-													ht={product.ecoParticipationHt}
-													ttc={product.ecoParticipationTtc}
-												/>
-											</TableCell>
-											<TableCell>
-												<StatusBadge product={product} />
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-							{rows.length === 0 ? (
-								<p className="px-4 py-8 text-center text-muted-foreground">
-									Aucun produit ne correspond aux filtres.
-								</p>
-							) : null}
-							<PaginationFooter products={products} rowCount={rows.length} />
-						</>
+												</TableCell>
+												<TableCell>{product.zone ?? "-"}</TableCell>
+												<TableCell>{product.molteniCategory}</TableCell>
+												<TableCell>
+													{getProductTypeLabel({
+														isComposition: product.isComposition,
+														parentId: product.parentId,
+													})}
+													{product.parentName ? (
+														<p className="text-xs text-muted-foreground">
+															{product.parentName}
+														</p>
+													) : null}
+												</TableCell>
+												<TableCell>
+													{product.weightKg === null
+														? "-"
+														: `${product.weightKg} kg`}
+												</TableCell>
+												<TableCell>
+													<MoneyPair
+														ht={product.priceHt}
+														ttc={calculateTtc(product.priceHt, product.tvaRate)}
+													/>
+												</TableCell>
+												<TableCell>
+													<MoneyPair
+														ht={product.ecoParticipationHt}
+														ttc={product.ecoParticipationTtc}
+													/>
+												</TableCell>
+												<TableCell>
+													<StatusBadge product={product} />
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+								{rows.length === 0 ? (
+									<p className="px-4 py-8 text-center text-muted-foreground">
+										Aucun produit ne correspond aux filtres.
+									</p>
+								) : null}
+							</>
+						)}
+					</CardContent>
+				</Card>
+				<div className="absolute inset-x-0 bottom-0">
+					{isInitialLoading ? (
+						<PaginationFooterSkeleton />
+					) : (
+						<PaginationFooter
+							onPageChange={setPage}
+							onNext={() => setPage((currentPage) => currentPage + 1)}
+							onPageSizeChange={(nextPageSize) => {
+								setPageSize(nextPageSize);
+								resetPage();
+							}}
+							onPrevious={() =>
+								setPage((currentPage) => Math.max(0, currentPage - 1))
+							}
+							page={productsPage}
+						/>
 					)}
-				</CardContent>
-			</Card>
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -261,33 +306,110 @@ function calculateTtc(valueHt: number | null, tvaRate: number) {
 	return valueHt * (1 + tvaRate);
 }
 
-function PaginationFooter({
-	products,
-	rowCount,
+function ProductTableHeader() {
+	return (
+		<TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
+			<TableRow>
+				<TableHead className="w-12">
+					<span className="sr-only">État</span>
+				</TableHead>
+				<TableHead className="bg-card">Produit</TableHead>
+				<TableHead className="bg-card">Zone</TableHead>
+				<TableHead className="bg-card">Catégorie</TableHead>
+				<TableHead className="bg-card">Type</TableHead>
+				<TableHead className="bg-card">Poids</TableHead>
+				<TableHead className="bg-card">Prix TTC / HT</TableHead>
+				<TableHead className="bg-card">Éco TTC / HT</TableHead>
+				<TableHead className="bg-card">Données</TableHead>
+			</TableRow>
+		</TableHeader>
+	);
+}
+
+function ProductRangeText({ page }: { page: ProductPage | undefined }) {
+	const visibleRange =
+		page && page.totalCount > 0
+			? `${page.startIndex}-${page.endIndex} sur ${page.totalCount}`
+			: "0";
+	return (
+		<p className="text-muted-foreground">
+			<span className="font-medium text-foreground">{visibleRange}</span>{" "}
+			produit
+			{page?.totalCount === 1 ? "" : "s"} affiché
+			{page?.totalCount === 1 ? "" : "s"}
+		</p>
+	);
+}
+
+function PageSizeSelect({
+	onPageSizeChange,
+	pageSize,
 }: {
-	products: ReturnType<typeof usePaginatedQuery>;
-	rowCount: number;
+	onPageSizeChange: (pageSize: number) => void;
+	pageSize: number;
 }) {
 	return (
-		<div className="flex items-center justify-between border-t px-4 py-3 text-sm">
-			<p className="text-muted-foreground">
-				{rowCount} produit{rowCount > 1 ? "s" : ""} chargé
-				{rowCount > 1 ? "s" : ""}
-			</p>
-			{products.status === "CanLoadMore" ? (
-				<Button
-					onClick={() => products.loadMore(12)}
-					type="button"
-					variant="outline"
-				>
-					Charger plus
-				</Button>
-			) : null}
-			{products.status === "LoadingMore" ? (
-				<Button disabled type="button" variant="outline">
-					Chargement...
-				</Button>
-			) : null}
+		<div className="flex items-center gap-2">
+			<span className="text-muted-foreground">Produits par page</span>
+			<Select
+				onValueChange={(value) => onPageSizeChange(Number(value))}
+				value={String(pageSize)}
+			>
+				<SelectTrigger className="h-8 w-20">
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{pageSizeOptions.map((option) => (
+						<SelectItem key={option} value={String(option)}>
+							{option}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		</div>
+	);
+}
+
+function PaginationFooter({
+	className,
+	onPageChange,
+	onNext,
+	onPageSizeChange,
+	onPrevious,
+	page,
+}: {
+	className?: string;
+	onPageChange: (page: number) => void;
+	onNext: () => void;
+	onPageSizeChange: (pageSize: number) => void;
+	onPrevious: () => void;
+	page: ProductPage | undefined;
+}) {
+	return (
+		<div
+			className={cn(
+				"flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm",
+				className,
+			)}
+		>
+			<div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+				<ProductRangeText page={page} />
+			</div>
+			<div className="flex flex-wrap items-center gap-3">
+				<PageSizeSelect
+					onPageSizeChange={onPageSizeChange}
+					pageSize={page?.pageSize ?? 50}
+				/>
+				<PaginationControls
+					hasNextPage={page?.hasNextPage}
+					hasPreviousPage={page?.hasPreviousPage}
+					onNext={onNext}
+					onPageChange={onPageChange}
+					onPrevious={onPrevious}
+					page={page?.page ?? 0}
+					totalPages={page?.totalPages ?? 1}
+				/>
+			</div>
 		</div>
 	);
 }
@@ -344,9 +466,74 @@ function dotClass(status: string) {
 
 function ProductsSkeleton() {
 	return (
-		<div className="space-y-4">
-			<Skeleton className="h-10 w-full" />
-			<Skeleton className="h-96 w-full" />
+		<div className="relative h-full min-h-0 overflow-hidden pb-28 md:pb-16">
+			<Card className="max-h-full overflow-hidden border-border/70">
+				<CardContent className="max-h-full p-0">
+					<ProductsTableSkeleton />
+				</CardContent>
+			</Card>
+			<div className="absolute inset-x-0 bottom-0">
+				<PaginationFooterSkeleton />
+			</div>
+		</div>
+	);
+}
+
+function ProductsTableSkeleton() {
+	return (
+		<div className="max-h-full overflow-hidden" aria-hidden>
+			<Table containerClassName="contents">
+				<ProductTableHeader />
+				<TableBody>
+					{skeletonRows.map((row) => (
+						<TableRow key={row}>
+							<TableCell className="align-middle">
+								<Skeleton className="mx-auto size-2.5 rounded-full" />
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-4 w-32" />
+								<Skeleton className="mt-1.5 h-3 w-16" />
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-4 w-8" />
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-4 w-24" />
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-4 w-28" />
+								<Skeleton className="mt-1.5 h-3 w-20" />
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-4 w-14" />
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-4 w-24" />
+								<Skeleton className="mt-1.5 h-3 w-20" />
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-4 w-20" />
+								<Skeleton className="mt-1.5 h-3 w-16" />
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-5 w-16 rounded-full" />
+							</TableCell>
+						</TableRow>
+					))}
+				</TableBody>
+			</Table>
+		</div>
+	);
+}
+
+function PaginationFooterSkeleton() {
+	return (
+		<div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+			<Skeleton className="h-4 w-36" />
+			<div className="flex items-center gap-3">
+				<Skeleton className="h-8 w-36" />
+				<Skeleton className="h-8 w-40" />
+			</div>
 		</div>
 	);
 }
@@ -385,3 +572,7 @@ const categoryFilterOptions: FilterOption[] = [
 		label: category,
 	})),
 ];
+
+const pageSizeOptions = [10, 25, 50, 100];
+
+const skeletonRows = Array.from({ length: 10 }, (_, index) => index);

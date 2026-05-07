@@ -58,7 +58,6 @@ export const Route = createFileRoute("/dashboard/")({
 	},
 	loader: async ({ context }) => {
 		const orpc = context.getOrpc();
-		await orpc.molteni.bootstrap();
 		return await orpc.molteni.dashboard();
 	},
 	pendingComponent: DashboardSkeleton,

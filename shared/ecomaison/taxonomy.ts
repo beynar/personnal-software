@@ -1,6 +1,6 @@
 export const SHOWROOM_KEY = "lyon";
 
-export const ZONES = ["A", "B", "C", "D", "F", "G", "H"] as const;
+export const ZONES = ["A", "B", "C", "D", "F", "G", "H", "Outdoor"] as const;
 
 export const MOLTENI_CATEGORIES = [
 	"Fauteuil",
@@ -8,6 +8,7 @@ export const MOLTENI_CATEGORIES = [
 	"Canapé",
 	"Pouf",
 	"Table",
+	"Bureau",
 	"Table basse",
 	"Table lounge",
 	"Meuble nuit",
@@ -141,6 +142,7 @@ export const CATEGORY_FAMILY_MAP: Record<MolteniCategory, EcomaisonFamily> = {
 	Canapé: "Siège avec rembourrage",
 	Pouf: "Siège avec rembourrage",
 	Table: "Meuble",
+	Bureau: "Meuble",
 	"Table basse": "Meuble",
 	"Table lounge": "Meuble",
 	"Meuble nuit": "Meuble",

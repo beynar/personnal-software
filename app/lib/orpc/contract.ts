@@ -56,7 +56,7 @@ const exampleResponseSchema = z.object({
 
 const productFiltersSchema = z.object({
 	search: z.string().optional(),
-	zone: z.enum(["A", "B", "C", "D", "F", "G", "H"]).optional(),
+	zone: z.enum(["A", "B", "C", "D", "F", "G", "H", "Outdoor"]).optional(),
 	category: z
 		.enum([
 			"Fauteuil",
@@ -88,6 +88,7 @@ const molteniCategorySchema = z.enum([
 	"Canapé",
 	"Pouf",
 	"Table",
+	"Bureau",
 	"Table basse",
 	"Table lounge",
 	"Meuble nuit",
@@ -130,7 +131,7 @@ const createProductBodySchema = z.object({
 	name: z.string().min(1),
 	variantLabel: z.string().optional(),
 	reference: z.string().optional(),
-	zone: z.enum(["A", "B", "C", "D", "F", "G", "H"]).optional(),
+	zone: z.enum(["A", "B", "C", "D", "F", "G", "H", "Outdoor"]).optional(),
 	molteniCategory: molteniCategorySchema,
 	ecomaisonFamily: ecomaisonFamilySchema,
 	materialTier: materialTierSchema.optional(),
@@ -200,16 +201,6 @@ export const apiContract = {
 			.output(exampleResponseSchema),
 	},
 	molteni: {
-		bootstrap: oc
-			.route({
-				method: "POST",
-				path: "/api/v1/molteni/bootstrap",
-				summary: "Seed Molteni workspace",
-				description:
-					"Idempotently seeds the Lyon showroom and sample inventory for the authenticated workspace.",
-				tags: ["molteni"],
-			})
-			.output(z.object({ ok: z.boolean() })),
 		dashboard: oc
 			.route({
 				method: "GET",

@@ -11,6 +11,8 @@
 import type * as auth from "../auth.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as productOrganizationMigration from "../productOrganizationMigration.js";
+import type * as productScope from "../productScope.js";
 import type * as products from "../products.js";
 import type * as realtime from "../realtime.js";
 import type * as users from "../users.js";
@@ -25,6 +27,8 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   files: typeof files;
   http: typeof http;
+  productOrganizationMigration: typeof productOrganizationMigration;
+  productScope: typeof productScope;
   products: typeof products;
   realtime: typeof realtime;
   users: typeof users;

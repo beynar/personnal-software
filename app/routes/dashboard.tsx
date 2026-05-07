@@ -101,12 +101,10 @@ function DashboardLayoutRoute() {
 function DashboardShell() {
 	const user = useQuery(api.users.viewer);
 	const syncViewerProfile = useMutation(api.users.syncViewerProfile);
-	const ensureSeedData = useMutation(api.products.ensureSeedData);
 	const pageHeader = getDashboardPageHeader(useMatches());
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 	const [theme, setTheme] = useState<"light" | "dark">("light");
-	const [hasSeededMolteniData, setHasSeededMolteniData] = useState(false);
 	const { data: activeOrganization, isPending: loadingActiveOrganization } =
 		authClient.useActiveOrganization();
 	const { data: organizations, isPending: loadingOrganizations } =
@@ -145,19 +143,6 @@ function DashboardShell() {
 	}, [syncViewerProfile, user?._id]);
 
 	useEffect(() => {
-		if (!user?._id || hasSeededMolteniData) return;
-		setHasSeededMolteniData(true);
-		ensureSeedData().catch((error) => {
-			setHasSeededMolteniData(false);
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Initialisation du barème impossible",
-			);
-		});
-	}, [ensureSeedData, hasSeededMolteniData, user?._id]);
-
-	useEffect(() => {
 		const root = document.documentElement;
 		setTheme(root.classList.contains("dark") ? "dark" : "light");
 	}, []);
@@ -189,7 +174,7 @@ function DashboardShell() {
 	}
 
 	return (
-		<SidebarProvider className="min-h-screen">
+		<SidebarProvider className="h-screen overflow-hidden">
 			<Sidebar>
 				<SidebarHeader className="h-14 p-0">
 					<DashboardSidebarOrganizationSwitcher />
@@ -213,8 +198,8 @@ function DashboardShell() {
 					user={user}
 				/>
 			</Sidebar>
-			<SidebarInset>
-				<header className="sticky top-0 z-10 h-14 border-b border-border/70 bg-background/95 backdrop-blur">
+			<SidebarInset className="h-screen min-h-0 overflow-hidden">
+				<header className="sticky top-0 z-10 h-14 shrink-0 border-b border-border/70 bg-background/95 backdrop-blur">
 					<div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6">
 						<div className="flex items-center gap-2">
 							<SidebarTrigger />
@@ -243,7 +228,7 @@ function DashboardShell() {
 						</div>
 					</div>
 				</header>
-				<div className="flex flex-1 flex-col px-4 py-6 [view-transition-name:dashboard-content] sm:px-6">
+				<div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col overflow-hidden px-4 py-6 [view-transition-name:dashboard-content] sm:px-6">
 					<Outlet />
 				</div>
 			</SidebarInset>
