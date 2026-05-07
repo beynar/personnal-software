@@ -1,7 +1,7 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useQuery } from "convex/react";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -66,6 +66,17 @@ type ProductPage = {
 	hasPreviousPage: boolean;
 	hasNextPage: boolean;
 };
+type CachedProductPage = {
+	filterKey: string;
+	page: ProductPage;
+};
+type ProductFilterKeyInput = {
+	category: CategoryFilter;
+	search: string | undefined;
+	status: ProductStatusFilter;
+	type: ProductTypeFilter;
+	zone: ZoneFilter;
+};
 
 export const Route = createFileRoute("/dashboard/products/")({
 	staticData: {
@@ -78,6 +89,43 @@ export const Route = createFileRoute("/dashboard/products/")({
 	component: ProductsPage,
 });
 
+function getProductFilterKey({
+	category,
+	search,
+	status,
+	type,
+	zone,
+}: ProductFilterKeyInput) {
+	return [search ?? "", zone, category, type, status].join("\u0000");
+}
+
+function getOptimisticProductPage(
+	page: ProductPage,
+	targetPage: number,
+	targetPageSize: number,
+): ProductPage {
+	const totalPages = Math.max(1, Math.ceil(page.totalCount / targetPageSize));
+	const boundedPage = Math.min(Math.max(0, targetPage), totalPages - 1);
+	const startOffset = boundedPage * targetPageSize;
+	const rowsOnPage = Math.min(
+		targetPageSize,
+		Math.max(0, page.totalCount - startOffset),
+	);
+	const startIndex = page.totalCount === 0 ? 0 : startOffset + 1;
+	const endIndex = startOffset + rowsOnPage;
+
+	return {
+		...page,
+		endIndex,
+		hasNextPage: endIndex < page.totalCount,
+		hasPreviousPage: boundedPage > 0,
+		page: boundedPage,
+		pageSize: targetPageSize,
+		startIndex,
+		totalPages,
+	};
+}
+
 function ProductsPage() {
 	const navigate = useNavigate();
 	const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
@@ -88,6 +136,14 @@ function ProductsPage() {
 	const [status, setStatus] = useState<ProductStatusFilter>("all");
 	const [page, setPage] = useState(0);
 	const [pageSize, setPageSize] = useState(50);
+	const searchQuery = search.trim() || undefined;
+	const filterKey = getProductFilterKey({
+		category,
+		search: searchQuery,
+		status,
+		type,
+		zone,
+	});
 	const productsPage = useQuery(
 		api.products.listProductsPage,
 		isAuthenticated
@@ -95,15 +151,31 @@ function ProductsPage() {
 					category,
 					page,
 					pageSize,
-					search: search.trim() || undefined,
+					search: searchQuery,
 					status,
 					type,
 					zone,
 				}
 			: "skip",
 	) as ProductPage | undefined;
-	const rows = productsPage?.rows ?? [];
-	const isInitialLoading = isAuthLoading || productsPage === undefined;
+	const [lastResolvedPage, setLastResolvedPage] =
+		useState<CachedProductPage | null>(null);
+	useEffect(() => {
+		if (productsPage === undefined) return;
+		setLastResolvedPage({ filterKey, page: productsPage });
+	}, [filterKey, productsPage]);
+	const cachedPage =
+		isAuthenticated && lastResolvedPage?.filterKey === filterKey
+			? lastResolvedPage.page
+			: undefined;
+	const displayedPage = productsPage ?? cachedPage;
+	const footerPage =
+		productsPage ??
+		(cachedPage
+			? getOptimisticProductPage(cachedPage, page, pageSize)
+			: undefined);
+	const rows = displayedPage?.rows ?? [];
+	const isInitialLoading = isAuthLoading || displayedPage === undefined;
 
 	function resetPage() {
 		setPage(0);
@@ -277,7 +349,7 @@ function ProductsPage() {
 							onPrevious={() =>
 								setPage((currentPage) => Math.max(0, currentPage - 1))
 							}
-							page={productsPage}
+							page={footerPage}
 						/>
 					)}
 				</div>
