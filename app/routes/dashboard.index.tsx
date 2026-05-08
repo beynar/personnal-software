@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
 	AlertTriangle,
 	ArrowRight,
@@ -65,6 +65,7 @@ export const Route = createFileRoute("/dashboard/")({
 });
 
 function DashboardOverviewPage() {
+	const navigate = useNavigate();
 	const data = Route.useLoaderData() as DashboardData;
 	const stats = data.stats;
 	const cards = [
@@ -120,7 +121,7 @@ function DashboardOverviewPage() {
 				))}
 			</div>
 
-			<div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+			<div className="grid items-start gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
 				<Card className="border-border/70">
 					<CardHeader>
 						<CardTitle>Complétude par catégorie</CardTitle>
@@ -188,7 +189,29 @@ function DashboardOverviewPage() {
 							</TableHeader>
 							<TableBody>
 								{data.attention.map((row) => (
-									<TableRow key={row._id}>
+									<TableRow
+										className="cursor-pointer"
+										key={row._id}
+										onClick={() =>
+											void navigate({
+												params: { productId: row._id },
+												to: "/dashboard/products/$productId",
+												viewTransition: true,
+											})
+										}
+										onKeyDown={(event) => {
+											if (event.key !== "Enter" && event.key !== " ") {
+												return;
+											}
+											event.preventDefault();
+											void navigate({
+												params: { productId: row._id },
+												to: "/dashboard/products/$productId",
+												viewTransition: true,
+											});
+										}}
+										tabIndex={0}
+									>
 										<TableCell>
 											<Link
 												className="font-medium hover:underline"
