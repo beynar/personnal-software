@@ -1,5 +1,6 @@
 "use client";
 
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { Check, ChevronDown, Loader2, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -26,6 +27,8 @@ export function OrganizationSwitcher({
 }: {
 	isCollapsed?: boolean;
 }) {
+	const navigate = useNavigate();
+	const router = useRouter();
 	const { data: activeOrganization, isPending: loadingActiveOrganization } =
 		authClient.useActiveOrganization();
 	const { data: organizations, isPending: loadingOrganizations } =
@@ -61,19 +64,26 @@ export function OrganizationSwitcher({
 
 		setError("");
 		setSwitchingOrganizationId(organizationId);
-		const { error: setActiveError } = await authClient.organization.setActive({
-			organizationId,
-		});
-		setSwitchingOrganizationId(null);
-
-		if (setActiveError) {
-			setError(
-				setActiveError.message ?? "Changement d’organisation impossible",
+		try {
+			const { error: setActiveError } = await authClient.organization.setActive(
+				{ organizationId },
 			);
-			return;
-		}
 
-		setOpen(false);
+			if (setActiveError) {
+				setError(
+					setActiveError.message ?? "Changement d’organisation impossible",
+				);
+				return;
+			}
+
+			authClient.$store.notify("$sessionSignal");
+			setOpen(false);
+			setSearch("");
+			await navigate({ replace: true, to: "/dashboard", viewTransition: true });
+			await router.invalidate();
+		} finally {
+			setSwitchingOrganizationId(null);
+		}
 	}
 
 	const organizationLabel = currentOrganization?.name ?? "Choisir un espace";
