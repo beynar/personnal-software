@@ -3,7 +3,11 @@
 declare namespace Cloudflare {
 	interface Env {
 		LOADER: WorkerLoader;
-		AUTH_SESSION_SECRET: string;
+		DB: D1Database;
+		BETTER_AUTH_SECRET: string;
+		SITE_URL?: string;
+		SUPER_ADMIN_SIGNUP_PASSWORD?: string;
+		TRUSTED_ORIGINS?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}
@@ -14,5 +18,13 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 };
 declare namespace NodeJS {
 	interface ProcessEnv
-		extends StringifyValues<Pick<Cloudflare.Env, "AUTH_SESSION_SECRET">> {}
+		extends StringifyValues<
+			Pick<
+				Cloudflare.Env,
+				| "BETTER_AUTH_SECRET"
+				| "SITE_URL"
+				| "SUPER_ADMIN_SIGNUP_PASSWORD"
+				| "TRUSTED_ORIGINS"
+			>
+		> {}
 }

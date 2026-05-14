@@ -19,7 +19,7 @@
   "include": [
     "app/**/*.ts",
     "app/**/*.tsx",
-    "convex/**/*.ts",
+    "drizzle.config.ts",
     "vite.config.ts",
     "worker-configuration.d.ts"
   ]

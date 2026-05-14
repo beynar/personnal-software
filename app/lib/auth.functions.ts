@@ -10,7 +10,7 @@ export type BetterAuthSessionStatus =
 /**
  * Resolves the current request session without collapsing auth transport
  * failures into an anonymous user. Route guards can avoid false logout
- * redirects while Convex still enforces data access server-side.
+ * redirects while the server-side data layer still enforces access.
  */
 async function resolveBetterAuthSessionStatus(): Promise<BetterAuthSessionStatus> {
 	try {

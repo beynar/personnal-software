@@ -1,14 +1,6 @@
 "use client";
 
-import { useMutation } from "convex/react";
-import { Camera, Trash2 } from "lucide-react";
-import {
-	type ChangeEvent,
-	type FormEvent,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
@@ -28,16 +20,15 @@ import {
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { updateViewerProfileFn } from "~/lib/profile.functions";
 
 type ProfileUser =
 	| {
-			bio?: string;
+			bio?: string | null;
 			email?: string;
 			image?: string | null;
 			name?: string;
-			username?: string;
+			username?: string | null;
 	  }
 	| null
 	| undefined;
@@ -52,20 +43,15 @@ type ProfileDraft = {
  * Renders a lightweight profile settings surface for the authenticated user.
  */
 export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
-	const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-	const updateProfile = useMutation(api.users.updateProfile);
-	const updateProfileImage = useMutation(api.users.updateProfileImage);
-	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [draft, setDraft] = useState<ProfileDraft>(createProfileDraft(user));
 	const [isSaving, setIsSaving] = useState(false);
-	const [isUploadingImage, setIsUploadingImage] = useState(false);
 
 	useEffect(() => {
 		setDraft(createProfileDraft(user));
 	}, [user]);
 
 	const isLoading = user === undefined;
-	const isDisabled = isLoading || !user || isSaving || isUploadingImage;
+	const isDisabled = isLoading || !user || isSaving;
 	const hasChanges = !!user && hasProfileChanges(draft, user);
 
 	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -77,7 +63,7 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 		setIsSaving(true);
 
 		try {
-			await updateProfile(draft);
+			await updateViewerProfileFn({ data: draft });
 			toast.success("Profil mis à jour");
 		} catch (error) {
 			toast.error(
@@ -87,76 +73,6 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 			);
 		} finally {
 			setIsSaving(false);
-		}
-	}
-
-	async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
-		const file = event.target.files?.[0];
-		if (!file) {
-			return;
-		}
-
-		if (!file.type.startsWith("image/")) {
-			toast.error("Choisissez un fichier image");
-			event.target.value = "";
-			return;
-		}
-
-		if (file.size > 5 * 1024 * 1024) {
-			toast.error("La photo doit faire 5 Mo maximum");
-			event.target.value = "";
-			return;
-		}
-
-		setIsUploadingImage(true);
-
-		try {
-			const uploadUrl = await generateUploadUrl();
-			const response = await fetch(uploadUrl, {
-				body: file,
-				headers: file.type ? { "Content-Type": file.type } : undefined,
-				method: "POST",
-			});
-
-			if (!response.ok) {
-				throw new Error("Import impossible");
-			}
-
-			const { storageId } = (await response.json()) as {
-				storageId?: Id<"_storage">;
-			};
-			if (!storageId) {
-				throw new Error("Import impossible");
-			}
-
-			await updateProfileImage({ storageId });
-			toast.success("Photo de profil mise à jour");
-		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Impossible de mettre à jour la photo de profil",
-			);
-		} finally {
-			setIsUploadingImage(false);
-			event.target.value = "";
-		}
-	}
-
-	async function handleRemoveImage() {
-		setIsUploadingImage(true);
-
-		try {
-			await updateProfileImage({ storageId: null });
-			toast.success("Photo de profil retirée");
-		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: "Impossible de retirer la photo de profil",
-			);
-		} finally {
-			setIsUploadingImage(false);
 		}
 	}
 
@@ -194,40 +110,11 @@ export function ProfileSettingsPage({ user }: { user: ProfileUser }) {
 									</p>
 								</div>
 							</div>
-							<div className="flex flex-wrap gap-3">
-								<input
-									accept="image/*"
-									className="hidden"
-									disabled={isDisabled}
-									onChange={handleImageChange}
-									ref={fileInputRef}
-									type="file"
-								/>
-								<Button
-									disabled={isDisabled}
-									onClick={() => fileInputRef.current?.click()}
-									type="button"
-									variant="outline"
-								>
-									<Camera className="size-4" />
-									<span>
-										{isUploadingImage
-											? "Import…"
-											: user?.image
-												? "Changer la photo"
-												: "Importer une photo"}
-									</span>
-								</Button>
-								<Button
-									disabled={isDisabled || !user?.image}
-									onClick={handleRemoveImage}
-									type="button"
-									variant="ghost"
-								>
-									<Trash2 className="size-4" />
-									<span>Retirer</span>
-								</Button>
-							</div>
+							<p className="max-w-xs text-sm text-muted-foreground">
+								L’import de fichiers n’est pas inclus dans le template D1.
+								Ajoutez R2 si une fonctionnalité produit a besoin de stockage
+								objet.
+							</p>
 						</div>
 						<FieldGroup>
 							<Field>

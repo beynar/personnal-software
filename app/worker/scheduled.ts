@@ -1,11 +1,11 @@
 /**
  * Cloudflare Workers Scheduled Event Handler
  *
- * This file handles cron-triggered events defined in wrangler.toml.
+ * This file handles cron-triggered events defined in wrangler.jsonc.
  * Cron Triggers let you run Workers on a schedule without any HTTP request.
  *
  * === How to activate ===
- * 1. Uncomment the [triggers] section in wrangler.toml
+ * 1. Uncomment the triggers object in wrangler.jsonc
  * 2. Deploy with `wrangler deploy`
  * 3. Cron triggers only run in production — use `wrangler dev --test-scheduled`
  *    then `curl "http://localhost:8787/__scheduled?cron=*+*+*+*+*"` to test locally

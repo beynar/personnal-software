@@ -6,7 +6,7 @@
  * making them ideal for rate limiting, session management, and coordination.
  *
  * === How to activate ===
- * 1. Uncomment the [[durable_objects.bindings]] and [[migrations]] in wrangler.toml
+ * 1. Uncomment the durable_objects bindings and migrations in wrangler.jsonc
  * 2. Deploy with `wrangler deploy` (migrations run automatically on first deploy)
  * 3. Access the DO from your Worker via env.RATE_LIMITER binding
  *

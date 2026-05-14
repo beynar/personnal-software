@@ -1,6 +1,6 @@
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { handleApiRequest } from "~/lib/api";
 import { normalizeMcpCode } from "~/lib/mcp-code";
 import { getExecutor } from "~/lib/mcp-sandbox";
@@ -54,6 +54,25 @@ interface ApiRouteNode {
 	$segment?: string;
 }
 
+type McpToolResult = {
+	content: Array<{ type: "text"; text: string }>;
+};
+
+type McpToolHandler = (
+	args: Record<string, unknown>,
+	extra: { authInfo?: AuthInfo },
+) => Promise<McpToolResult>;
+
+type RegisterTool = (
+	name: string,
+	config: {
+		title: string;
+		description: string;
+		inputSchema: Record<string, z.ZodTypeAny>;
+	},
+	handler: McpToolHandler,
+) => void;
+
 const MAX_BODY_BYTES = 128 * 1024;
 const EXECUTABLE_ROUTE_CATALOG = buildExecutableRouteCatalog();
 
@@ -67,6 +86,18 @@ const ALLOWED_HEADERS = new Set([
 	"last-modified",
 	"location",
 ]);
+
+const searchRoutesInputSchema = {
+	query: z
+		.string()
+		.describe(
+			"Search text. You may provide a single query or a comma-separated list of queries. Search matches route methods, paths, summaries, descriptions, tags, parameters, and schema summaries.",
+		),
+} satisfies Record<string, z.ZodTypeAny>;
+
+const codeInputSchema = {
+	code: z.string().describe("JavaScript code to normalize or execute."),
+} satisfies Record<string, z.ZodTypeAny>;
 
 function requireSession(authInfo?: AuthInfo): McpSession {
 	const session = authInfo?.extra?.session;
@@ -422,21 +453,19 @@ function buildExecutableRouteCatalog(): CatalogEntry[] {
 }
 
 export function registerMcpTools(server: McpServer): void {
-	server.registerTool(
+	const registerTool = server.registerTool.bind(server) as RegisterTool;
+	registerTool(
 		"search-routes",
 		{
 			title: "Search Routes",
 			description:
 				"Search the OpenAPI route catalog. Use this to find relevant API operations before executing requests.",
-			inputSchema: z.object({
-				query: z
-					.string()
-					.describe(
-						"Search text. You may provide a single query or a comma-separated list of queries. Search matches route methods, paths, summaries, descriptions, tags, parameters, and schema summaries.",
-					),
-			}),
+			inputSchema: searchRoutesInputSchema,
 		},
 		async ({ query }) => {
+			if (typeof query !== "string") {
+				throw new Error("Missing search query");
+			}
 			const normalizedQueries = Array.from(
 				new Set(
 					query
@@ -469,17 +498,18 @@ export function registerMcpTools(server: McpServer): void {
 		},
 	);
 
-	server.registerTool(
+	registerTool(
 		"execute",
 		{
 			title: "Execute Code",
 			description:
 				'Execute JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox exposes an `api.*` proxy derived from executable OpenAPI routes. Use `search-routes` first to discover available routes and their input/output types, then call them with route-shaped code such as `await api.examples.exampleId.workflow.post({ params: { exampleId: "sample" }, query: { q: "widget", limit: 5, dryRun: true, channel: "email" }, body: { message: "hello", priority: "high" } })`. Parameterized path segments become plain parameter-name properties in the proxy. Route method calls accept an object with optional `params`, `query`, `headers`, and `body`. Code is normalized before execution, so fenced code blocks, expressions, top-level await, function declarations, and export defaults are accepted.',
-			inputSchema: z.object({
-				code: z.string().describe("JavaScript code to normalize and execute."),
-			}),
+			inputSchema: codeInputSchema,
 		},
 		async ({ code }, extra) => {
+			if (typeof code !== "string") {
+				throw new Error("Missing code");
+			}
 			requireSession(extra.authInfo);
 			const execution = await executeSandboxedCode(code, extra.authInfo);
 			return {
@@ -493,17 +523,18 @@ export function registerMcpTools(server: McpServer): void {
 		},
 	);
 
-	server.registerTool(
+	registerTool(
 		"normalize-code",
 		{
 			title: "Normalize Code",
 			description:
 				"Normalize JavaScript before calling `execute`. Use this when generated code may be fenced markdown, a bare expression, top-level await, a function declaration, or an export default. The returned code is the async function shape that the sandbox executes.",
-			inputSchema: z.object({
-				code: z.string().describe("JavaScript code to normalize."),
-			}),
+			inputSchema: codeInputSchema,
 		},
 		async ({ code }) => {
+			if (typeof code !== "string") {
+				throw new Error("Missing code");
+			}
 			return {
 				content: [
 					{

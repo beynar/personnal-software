@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
 import { ProfileSettingsPage } from "~/components/profile/profile-settings-page";
-import { api } from "../../convex/_generated/api";
+import { getViewerProfileFn } from "~/lib/profile.functions";
 
 export const Route = createFileRoute("/dashboard/profile")({
+	loader: async () => {
+		return await getViewerProfileFn();
+	},
 	staticData: {
 		dashboardHeader: {
 			description: "Gérez les informations du compte et la photo de profil.",
@@ -14,7 +16,7 @@ export const Route = createFileRoute("/dashboard/profile")({
 });
 
 function DashboardProfileRoute() {
-	const user = useQuery(api.users.viewer);
+	const user = Route.useLoaderData();
 
 	return <ProfileSettingsPage user={user} />;
 }

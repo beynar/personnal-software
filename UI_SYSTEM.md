@@ -114,7 +114,7 @@ Preferred order:
 2. generate or install the component into `app/components/ui`
 3. verify imports and aliases
 4. make sure the component uses the existing token system
-5. run `npm run lint`, `npm run typecheck`, and `npm run build`
+5. run `pnpm lint`, `pnpm typecheck`, and `pnpm build`
 
 Rules:
 
@@ -186,7 +186,7 @@ Recommended patterns:
 
 ## Dashboard-specific rules
 
-For authenticated product pages:
+For authenticated application pages:
 
 - keep navigation inside the dashboard sidebar
 - keep pages nested under `dashboard.tsx` so layout state persists
@@ -221,9 +221,9 @@ Bad:
 Always run:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run build
+pnpm lint
+pnpm typecheck
+pnpm build
 ```
 
 If the change affects navigation, auth, or responsive behavior, also verify it in the browser.

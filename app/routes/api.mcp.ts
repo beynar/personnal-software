@@ -45,7 +45,7 @@ function createUnauthorizedResponse(request: Request): Response {
 	const headers = new Headers(CORS_HEADERS);
 	headers.set(
 		"WWW-Authenticate",
-		`Bearer resource_metadata="${new URL(request.url).origin}/oauth-protected-resource"`,
+		`Bearer resource_metadata="${new URL(request.url).origin}/.well-known/oauth-protected-resource"`,
 	);
 
 	return new Response(null, {

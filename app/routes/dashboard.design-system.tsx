@@ -474,7 +474,7 @@ Streamdown gives the app a single component for rendering rich markdown document
 
 ## Why it matters
 
-- Reuse one renderer across product docs, AI responses, and internal knowledge surfaces.
+- Reuse one renderer across application docs, AI responses, and internal knowledge surfaces.
 - Keep markdown readable in both light and dark mode.
 - Support richer blocks without building custom renderers for each format.
 
@@ -729,7 +729,7 @@ function FormShowcase() {
 							/>
 							<FieldDescription>
 								Ownership and auth-sensitive actions should always be checked in
-								Convex, not just in the form.
+								server-side repositories, not just in the form.
 							</FieldDescription>
 							<FieldError>Enter a valid email address.</FieldError>
 						</FieldContent>
@@ -1442,12 +1442,10 @@ function TypographyShowcase() {
 					<p className="mt-2 text-sm text-muted-foreground">
 						Use{" "}
 						<code className="rounded bg-muted px-1.5 py-0.5">
-							npx convex dev
+							pnpm wrangler d1 migrations apply
 						</code>{" "}
-						for local backend sync and keep{" "}
-						<code className="rounded bg-muted px-1.5 py-0.5">
-							npm run build
-						</code>{" "}
+						for database sync and keep{" "}
+						<code className="rounded bg-muted px-1.5 py-0.5">pnpm build</code>{" "}
 						in the validation loop.
 					</p>
 				</div>
@@ -1596,7 +1594,7 @@ function DiceDataShowcase() {
 						<StatValue>182ms</StatValue>
 						<StatSeparator />
 						<StatDescription>
-							Stable across read-heavy Convex routes.
+							Stable across read-heavy D1 routes.
 						</StatDescription>
 					</Stat>
 					<Stat>
@@ -1881,7 +1879,7 @@ function BannerShowcaseControls() {
 									<div className="min-w-0 flex-1">
 										<BannerTitle>Deployment notice</BannerTitle>
 										<BannerDescription>
-											Wrangler secrets and Convex env values should be updated
+											Wrangler secrets and D1 migrations should be updated
 											together before shipping.
 										</BannerDescription>
 									</div>
@@ -1945,8 +1943,8 @@ function TimelineShowcase() {
 							<TimelineTime dateTime="2026-04-01">April 1</TimelineTime>
 							<TimelineTitle>Bootstrap the workspace</TimelineTitle>
 							<TimelineDescription>
-								Provision Convex, sync Wrangler secrets, and verify auth before
-								building product features.
+								Provision D1, sync Wrangler secrets, and verify auth before
+								building domain features.
 							</TimelineDescription>
 						</TimelineHeader>
 					</TimelineContent>
@@ -1972,7 +1970,7 @@ function TimelineShowcase() {
 							<TimelineTime dateTime="2026-04-07">April 7</TimelineTime>
 							<TimelineTitle>Ship user-facing flows</TimelineTitle>
 							<TimelineDescription>
-								Move from primitives to actual product surfaces once the
+								Move from primitives to actual application surfaces once the
 								template boundaries are stable.
 							</TimelineDescription>
 						</TimelineHeader>
@@ -2055,8 +2053,8 @@ function TourShowcase() {
 						<TourHeader>
 							<TourTitle>Start with the data model</TourTitle>
 							<TourDescription>
-								Convex code quality is downstream of table design. Decide
-								ownership, relations, and indexes before touching the UI.
+								D1 code quality is downstream of table design. Decide ownership,
+								relations, and indexes before touching the UI.
 							</TourDescription>
 						</TourHeader>
 						<TourFooter className="items-center justify-between">
@@ -2121,7 +2119,7 @@ function SidebarShowcase() {
 			title="Sidebar"
 		>
 			<div className="overflow-hidden rounded-2xl border border-border/70">
-				<SidebarProvider className="min-h-[360px]" defaultOpen>
+				<SidebarProvider className="h-[360px] min-h-0" defaultOpen>
 					<Sidebar className="top-0 h-[360px] min-h-[360px]">
 						<SidebarHeader>
 							<div className="rounded-2xl border border-sidebar-border bg-sidebar-accent px-3 py-3 text-sidebar-accent-foreground">
@@ -2165,7 +2163,7 @@ function SidebarShowcase() {
 							</div>
 						</SidebarFooter>
 					</Sidebar>
-					<SidebarInset>
+					<SidebarInset className="min-h-0">
 						<div className="flex h-[360px] flex-col bg-background">
 							<div className="border-b border-border/70 px-6 py-4">
 								<p className="font-medium">Nested content area</p>
@@ -2230,7 +2228,7 @@ function MarkdownShowcase() {
 					<Badge variant="secondary">Streamdown</Badge>
 					<Badge variant="outline">Document renderer</Badge>
 					<span>
-						Use this surface for docs, knowledge pages, and any product area
+						Use this surface for docs, knowledge pages, and any application area
 						that needs polished markdown output.
 					</span>
 				</div>

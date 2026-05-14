@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useConvexAuth } from "convex/react";
-import { useQuery } from "convex/react";
 import { LogIn, Shield } from "lucide-react";
 import { PublicAuthCard } from "~/components/auth/public-auth-card";
 import { Button } from "~/components/ui/button";
@@ -11,8 +9,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from "~/components/ui/card";
+import { authClient } from "~/lib/auth-client";
 import { PROJECT_NAME } from "~/lib/project";
-import { api } from "../../convex/_generated/api";
 
 type McpSearchParams = {
 	client_id?: string;
@@ -60,10 +58,11 @@ function buildAuthorizeUrl(search: McpSearchParams): string {
 
 function McpLoginPage() {
 	const search = Route.useSearch();
-	const { isAuthenticated, isLoading } = useConvexAuth();
+	const { data: sessionData, isPending } = authClient.useSession();
+	const isAuthenticated = Boolean(sessionData?.user);
 	const hasAuthorizationContext = Boolean(search.client_id);
 
-	if (isLoading) {
+	if (isPending) {
 		return (
 			<div className="flex min-h-screen items-center justify-center px-4">
 				<Card className="w-full max-w-sm">
@@ -142,7 +141,8 @@ function McpContextBanner({ search }: { search: McpSearchParams }) {
 }
 
 function AuthenticatedContinueCard({ search }: { search: McpSearchParams }) {
-	const user = useQuery(api.users.viewer);
+	const { data: sessionData } = authClient.useSession();
+	const user = sessionData?.user;
 	const authorizeUrl = buildAuthorizeUrl(search);
 	const hasAuthorizationContext = Boolean(search.client_id);
 

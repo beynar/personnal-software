@@ -4,7 +4,7 @@ export const PROJECT_NAME = getProjectName();
 export const PROJECT_INITIALS = getProjectInitials(PROJECT_NAME);
 
 function getProjectName() {
-	const value = import.meta.env.VITE_PROJECT_NAME;
+	const value = import.meta.env.VITE_APP_NAME;
 
 	if (typeof value !== "string") {
 		return DEFAULT_PROJECT_NAME;

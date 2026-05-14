@@ -7,22 +7,19 @@ import {
 	useMatches,
 	useNavigate,
 } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
 import {
 	ArrowLeft,
 	BookOpen,
 	Building2,
 	Copy,
-	FileSpreadsheet,
 	Home,
 	Key,
+	Layers3,
 	LogOut,
 	Mail,
 	Moon,
-	Plus,
 	Sun,
 	UserRound,
-	Warehouse,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -65,17 +62,10 @@ import { getDashboardPageHeader } from "~/lib/dashboard-page-header";
 import { ensureOrganizationForSession } from "~/lib/organization";
 import { PROJECT_NAME } from "~/lib/project";
 import { cn } from "~/lib/utils";
-import { api } from "../../convex/_generated/api";
 
 const dashboardLinks = [
-	{ to: "/dashboard", label: "Tableau de bord", icon: Home },
-	{ to: "/dashboard/products", label: "Produits", icon: Warehouse },
-	{ to: "/dashboard/declaration", label: "Déclaration", icon: FileSpreadsheet },
-	{
-		to: "/dashboard/reference",
-		label: "Référence éco-participation",
-		icon: BookOpen,
-	},
+	{ to: "/dashboard", label: "Dashboard", icon: Home },
+	{ to: "/dashboard/design-system", label: "Design System", icon: Layers3 },
 ] as const;
 
 export const Route = createFileRoute("/dashboard")({
@@ -87,7 +77,7 @@ export const Route = createFileRoute("/dashboard")({
 	},
 	staticData: {
 		dashboardHeader: {
-			description: "Espace éco-participation Molteni&C France",
+			description: "Authenticated application workspace",
 			title: "Tableau de bord",
 		},
 	},
@@ -99,8 +89,17 @@ function DashboardLayoutRoute() {
 }
 
 function DashboardShell() {
-	const user = useQuery(api.users.viewer);
-	const syncViewerProfile = useMutation(api.users.syncViewerProfile);
+	const { data: sessionData, isPending: loadingSession } =
+		authClient.useSession();
+	const user = sessionData?.user
+		? {
+				email: sessionData.user.email,
+				image: sessionData.user.image,
+				name: sessionData.user.name,
+			}
+		: loadingSession
+			? undefined
+			: null;
 	const pageHeader = getDashboardPageHeader(useMatches());
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
@@ -111,7 +110,7 @@ function DashboardShell() {
 		authClient.useListOrganizations();
 
 	useEffect(() => {
-		if (!user?._id) return;
+		if (!user?.email) return;
 		if (loadingActiveOrganization || loadingOrganizations) return;
 		void ensureOrganizationForSession(
 			authClient,
@@ -132,15 +131,9 @@ function DashboardShell() {
 		loadingActiveOrganization,
 		loadingOrganizations,
 		organizations,
-		user?._id,
 		user?.email,
 		user?.name,
 	]);
-
-	useEffect(() => {
-		if (!user?._id) return;
-		void syncViewerProfile();
-	}, [syncViewerProfile, user?._id]);
 
 	useEffect(() => {
 		const root = document.documentElement;
@@ -228,7 +221,7 @@ function DashboardShell() {
 						</div>
 					</div>
 				</header>
-				<div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col overflow-hidden px-4 py-6 [view-transition-name:dashboard-content] sm:px-6">
+				<div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col overflow-y-auto px-4 py-6 [view-transition-name:dashboard-content] sm:px-6">
 					<Outlet />
 				</div>
 			</SidebarInset>
@@ -269,22 +262,8 @@ function DashboardSidebarLink({
 	);
 }
 
-function DashboardHeaderActions({ pathname }: { pathname: string }) {
-	if (
-		!pathname.startsWith("/dashboard/products") ||
-		pathname === "/dashboard/products/new"
-	) {
-		return null;
-	}
-
-	return (
-		<Button asChild>
-			<Link to="/dashboard/products/new" viewTransition>
-				<Plus className="size-4" />
-				Ajouter un produit
-			</Link>
-		</Button>
-	);
+function DashboardHeaderActions({ pathname: _pathname }: { pathname: string }) {
+	return null;
 }
 
 function DashboardSidebarOrganizationSwitcher() {

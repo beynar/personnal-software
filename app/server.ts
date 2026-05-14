@@ -8,8 +8,6 @@ import { createServerApiClient } from "~/lib/orpc/client.server";
 
 const startFetch = createStartHandler(defaultStreamHandler);
 
-const convexSiteUrl = import.meta.env.VITE_CONVEX_SITE_URL as string;
-
 const CORS_HEADERS = {
 	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -30,8 +28,8 @@ function jsonResponse(body: Record<string, unknown>): Response {
  * Describes the Better Auth authority so MCP clients know where to
  * authorize, exchange tokens, and register dynamic clients.
  */
-function handleOAuthAuthorizationServer(): Response {
-	const issuer = `${convexSiteUrl}/api/auth`;
+function handleOAuthAuthorizationServer(origin: string): Response {
+	const issuer = `${origin}/api/auth`;
 	return jsonResponse({
 		issuer,
 		authorization_endpoint: `${issuer}/mcp/authorize`,
@@ -53,7 +51,7 @@ function handleOAuthAuthorizationServer(): Response {
 function handleOAuthProtectedResource(origin: string): Response {
 	return jsonResponse({
 		resource: `${origin}/api/mcp`,
-		authorization_servers: [`${convexSiteUrl}/api/auth`],
+		authorization_servers: [`${origin}/api/auth`],
 		bearer_methods_supported: ["header"],
 	});
 }
@@ -70,7 +68,7 @@ function createServerEntry(entry: ServerEntry): ServerEntry {
 				if (request.method === "OPTIONS") {
 					return new Response(null, { status: 204, headers: CORS_HEADERS });
 				}
-				return handleOAuthAuthorizationServer();
+				return handleOAuthAuthorizationServer(url.origin);
 			}
 			if (url.pathname === "/.well-known/oauth-protected-resource") {
 				if (request.method === "OPTIONS") {

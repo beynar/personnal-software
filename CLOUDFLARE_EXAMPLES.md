@@ -10,7 +10,7 @@ Primary repo skill:
 
 Primary documentation rule:
 
-- use the skill for product selection and repo conventions
+- use the skill for Cloudflare service selection and repo conventions
 - use current Cloudflare docs for API shapes, bindings, limits, and config
 - do not fill in Cloudflare APIs from model memory when promoting an example into real code
 
@@ -107,7 +107,7 @@ Purpose:
 
 Document:
 
-- required `wrangler.toml` bindings
+- required `wrangler.jsonc` bindings
 - migration requirements
 - what state is stored and why
 
@@ -148,7 +148,7 @@ LLM use:
 
 ## Rules
 
-- keep examples isolated from the product unless actually used
+- keep examples isolated from the application unless actually used
 - keep examples documented
 - do not leave secret values in example files
 - if an example becomes a real feature, move it into the app deliberately and update docs

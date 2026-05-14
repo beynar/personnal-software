@@ -15,6 +15,7 @@ export interface ApiAuthSession {
 	expiresAt: Date;
 	createdAt: Date;
 	updatedAt: Date;
+	activeOrganizationId?: string | null;
 }
 
 export interface ApiAuthResult {
