@@ -42,7 +42,6 @@ export function DashboardSidebarCommandBar({
 	onThemeChange,
 	theme,
 }: DashboardSidebarCommandBarProps) {
-	const navigate = useNavigate();
 	const { isCollapsed, isMobile } = useSidebar();
 	const { data: activeOrganization } = authClient.useActiveOrganization();
 	const [open, setOpen] = useState(false);

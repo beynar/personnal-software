@@ -8,8 +8,8 @@ import {
 	resolveAuthSession,
 } from "~/lib/api-auth";
 import { auth } from "~/lib/auth";
-import { MCP_SERVER_INFO, createAuthInfo, registerMcpTools } from "~/lib/mcp";
-import { type McpSession, createRestAuthHeaders } from "~/lib/rest-auth";
+import { createAuthInfo, MCP_SERVER_INFO, registerMcpTools } from "~/lib/mcp";
+import { createRestAuthHeaders, type McpSession } from "~/lib/rest-auth";
 
 const CORS_HEADERS = {
 	"Access-Control-Allow-Origin": "*",

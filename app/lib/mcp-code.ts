@@ -1,4 +1,3 @@
-import { parse } from "acorn";
 import type {
 	AnonymousClassDeclaration,
 	AnonymousFunctionDeclaration,
@@ -8,6 +7,7 @@ import type {
 	Node,
 	Program,
 } from "acorn";
+import { parse } from "acorn";
 
 export type NormalizedMcpCode = {
 	code: string;

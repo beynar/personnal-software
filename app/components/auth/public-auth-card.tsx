@@ -18,7 +18,9 @@ import { PROJECT_NAME } from "~/lib/project";
 
 export function PublicAuthCard({
 	onAuthSuccess,
-}: { onAuthSuccess?: () => void } = {}) {
+}: {
+	onAuthSuccess?: () => void;
+} = {}) {
 	return (
 		<Card className="w-full max-w-sm">
 			<CardHeader className="text-center">

@@ -1,6 +1,5 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-	Building2,
 	Camera,
 	ChevronRight,
 	Clock3,

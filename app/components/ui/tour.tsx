@@ -1,14 +1,14 @@
 "use client";
 
 import {
-	type Middleware,
-	type Placement,
 	autoUpdate,
 	flip,
 	hide,
 	limitShift,
+	type Middleware,
 	offset,
 	arrow as onArrow,
+	type Placement,
 	shift,
 	useFloating,
 } from "@floating-ui/react-dom";

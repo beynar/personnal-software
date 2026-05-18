@@ -5,13 +5,13 @@ import { handleApiRequest } from "~/lib/api";
 import { normalizeMcpCode } from "~/lib/mcp-code";
 import { getExecutor } from "~/lib/mcp-sandbox";
 import {
-	type CatalogEntry,
 	buildCatalog,
+	type CatalogEntry,
 	searchCatalog,
 	searchPublicCatalog,
 } from "~/lib/openapi-catalog";
 import { PROJECT_NAME } from "~/lib/project";
-import { type McpSession, createRestAuthHeaders } from "~/lib/rest-auth";
+import type { McpSession } from "~/lib/rest-auth";
 
 export const MCP_SERVER_INFO = {
 	name: PROJECT_NAME,

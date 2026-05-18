@@ -1,4 +1,4 @@
-import { RpcTarget, env } from "cloudflare:workers";
+import { env, RpcTarget } from "cloudflare:workers";
 
 import { normalizeMcpCode } from "~/lib/mcp-code";
 

@@ -1,8 +1,8 @@
 import type { Register } from "@tanstack/react-router";
 import {
-	type RequestHandler,
 	createStartHandler,
 	defaultStreamHandler,
+	type RequestHandler,
 } from "@tanstack/react-start/server";
 import { createServerApiClient } from "~/lib/orpc/client.server";
 

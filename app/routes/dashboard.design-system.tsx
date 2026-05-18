@@ -15,11 +15,9 @@ import {
 	CircleAlert,
 	Command as CommandIcon,
 	CreditCard,
-	GalleryVerticalEnd,
 	Grip,
 	Images,
 	LayoutTemplate,
-	MoreHorizontal,
 	Package,
 	Search,
 	Settings2,
@@ -59,8 +57,8 @@ import {
 	BannerActions,
 	BannerClose,
 	BannerDescription,
-	BannerTitle,
 	Banners,
+	BannerTitle,
 	useBanners,
 } from "~/components/ui/banner";
 import {
@@ -309,7 +307,6 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarProvider,
-	useSidebar,
 } from "~/components/ui/sidebar";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Slider } from "~/components/ui/slider";

@@ -1,7 +1,7 @@
 import {
+	createFileRoute,
 	Link,
 	Outlet,
-	createFileRoute,
 	redirect,
 	useLocation,
 	useMatches,
@@ -56,11 +56,10 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { authClient } from "~/lib/auth-client";
 import { getBetterAuthSessionStatus } from "~/lib/auth.functions";
+import { authClient } from "~/lib/auth-client";
 import { getDashboardPageHeader } from "~/lib/dashboard-page-header";
 import { ensureOrganizationForSession } from "~/lib/organization";
-import { PROJECT_NAME } from "~/lib/project";
 import { cn } from "~/lib/utils";
 
 const dashboardLinks = [

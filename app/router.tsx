@@ -1,8 +1,7 @@
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { getDefaultApiClient } from "~/lib/orpc/client";
-
-import { routeTree } from "./routeTree.gen";
 import type { AppRouterContext } from "./router-context";
+import { routeTree } from "./routeTree.gen";
 import type { AppServerRequestContext } from "./server-request-context";
 
 function createRouter() {

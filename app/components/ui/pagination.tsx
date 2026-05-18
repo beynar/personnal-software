@@ -334,14 +334,14 @@ function PaginationEllipsis({
 
 export {
 	Pagination,
-	PaginationContent,
 	PaginationButton,
+	PaginationContent,
 	PaginationControls,
-	PaginationLink,
+	PaginationEllipsis,
 	PaginationItem,
-	PaginationPrevious,
-	PaginationPreviousButton,
+	PaginationLink,
 	PaginationNext,
 	PaginationNextButton,
-	PaginationEllipsis,
+	PaginationPrevious,
+	PaginationPreviousButton,
 };

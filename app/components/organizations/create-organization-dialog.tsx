@@ -15,8 +15,8 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { authClient } from "~/lib/auth-client";
 import {
-	OrganizationSlugUnavailableError,
 	createOrganizationWithAvailableSlug,
+	OrganizationSlugUnavailableError,
 	toOrganizationSlug,
 } from "~/lib/organization";
 
