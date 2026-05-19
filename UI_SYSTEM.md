@@ -39,6 +39,7 @@ Current local primitives in `app/components/ui/`:
 - `chart`
 - `checkbox`
 - `collapsible`
+- `combobox`
 - `command`
 - `context-menu`
 - `dialog`
@@ -96,7 +97,6 @@ Related compound pieces that also exist in this repo:
 
 Docs patterns or higher-level compositions that should be built on top of the primitives above:
 
-- `combobox` via `Popover + Command`
 - `data-table` via the local `app/components/data-table/*` helpers plus `Table`
 - `date-picker` via `Popover + Button + Calendar`
 - `typography` via semantic HTML plus the token-aware utility scale
@@ -230,7 +230,6 @@ If the change affects navigation, auth, or responsive behavior, also verify it i
 
 If the change touches the Design System page, verify that every installed primitive still appears there and that the docs-only patterns remain rendered:
 
-- `combobox`
 - `data-table`
 - `date-picker`
 - `typography`

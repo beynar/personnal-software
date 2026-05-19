@@ -11,7 +11,6 @@ import {
 	Bell,
 	Calendar as CalendarIcon,
 	Check,
-	ChevronsUpDown,
 	CircleAlert,
 	Command as CommandIcon,
 	CreditCard,
@@ -103,6 +102,14 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "~/components/ui/collapsible";
+import {
+	Combobox,
+	ComboboxContent,
+	ComboboxEmpty,
+	ComboboxInput,
+	ComboboxItem,
+	ComboboxList,
+} from "~/components/ui/combobox";
 import {
 	Command,
 	CommandEmpty,
@@ -1070,7 +1077,7 @@ function CommandShowcase() {
 	return (
 		<ShowcaseCard
 			className="border-border/70"
-			description="Command palette plus the combobox docs pattern."
+			description="Command palette plus the first-class shadcn combobox primitive."
 			title="Command and Combobox"
 		>
 			<div className="space-y-5">
@@ -1107,37 +1114,23 @@ function CommandShowcase() {
 				</Dialog>
 				<div className="space-y-2">
 					<Label>Combobox</Label>
-					<Popover>
-						<PopoverTrigger asChild>
-							<Button className="w-full justify-between" variant="outline">
-								{value}
-								<ChevronsUpDown className="size-4 opacity-60" />
-							</Button>
-						</PopoverTrigger>
-						<PopoverContent className="w-[260px] p-0">
-							<Command>
-								<CommandInput placeholder="Search views..." />
-								<CommandList>
-									<CommandEmpty>No view found.</CommandEmpty>
-									<CommandGroup>
-										{comboboxOptions.map((option) => (
-											<CommandItem
-												key={option}
-												onSelect={() => setValue(option)}
-											>
-												<Check
-													className={`mr-2 size-4 ${
-														value === option ? "opacity-100" : "opacity-0"
-													}`}
-												/>
-												{option}
-											</CommandItem>
-										))}
-									</CommandGroup>
-								</CommandList>
-							</Command>
-						</PopoverContent>
-					</Popover>
+					<Combobox
+						items={comboboxOptions}
+						onValueChange={(nextValue) => setValue(nextValue ?? "")}
+						value={value}
+					>
+						<ComboboxInput placeholder="Search views..." />
+						<ComboboxContent>
+							<ComboboxEmpty>No view found.</ComboboxEmpty>
+							<ComboboxList>
+								{(option) => (
+									<ComboboxItem key={option} value={option}>
+										{option}
+									</ComboboxItem>
+								)}
+							</ComboboxList>
+						</ComboboxContent>
+					</Combobox>
 				</div>
 			</div>
 		</ShowcaseCard>
