@@ -26,6 +26,7 @@ When adding a page:
 - Add public pages as top-level route files in `app/routes/`.
 - If the page should keep the sidebar visible during navigation, make it a child of `dashboard.tsx`.
 - Define a loading component with a skeleton for each new page.
+- Rely on the shared route error states unless the page needs domain-specific recovery.
 
 ## Route Responsibilities
 
@@ -46,6 +47,8 @@ Do not use route files for:
 - reusable mutations or query logic
 
 Those belong in server-only code behind `app/db/` and `app/lib/orpc/`.
+
+Shared route failures live in `app/components/route-error-state.tsx`. Root and dashboard routes already use them for normal 404, forbidden, and server-error cases.
 
 ## Loaders
 
@@ -103,6 +106,7 @@ Server-side authorization patterns:
 
 - derive identity from Better Auth
 - derive active organization from the session or membership table
+- use `requireAuthenticatedActor`, `requireActiveOrganizationMembership`, or `requireOrganizationMembership` from `app/lib/orpc/authorization.ts`
 - never accept `userId` from the client for auth decisions
 - check ownership inside the repository/service that reads or writes protected data
 
@@ -139,6 +143,7 @@ After adding or changing a feature, run:
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm run doctor
 ```
 
 If the feature changes auth or ownership, also verify unauthenticated access, authenticated access, redirect behavior, and ownership enforcement.

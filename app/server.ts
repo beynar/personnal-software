@@ -4,57 +4,14 @@ import {
 	defaultStreamHandler,
 	type RequestHandler,
 } from "@tanstack/react-start/server";
+import {
+	handleOAuthAuthorizationServer,
+	handleOAuthOptions,
+	handleOAuthProtectedResource,
+} from "~/lib/mcp-oauth";
 import { createServerApiClient } from "~/lib/orpc/client.server";
 
 const startFetch = createStartHandler(defaultStreamHandler);
-
-const CORS_HEADERS = {
-	"Access-Control-Allow-Origin": "*",
-	"Access-Control-Allow-Methods": "GET, OPTIONS",
-	"Access-Control-Allow-Headers": "Accept",
-} as const;
-
-function jsonResponse(body: Record<string, unknown>): Response {
-	return new Response(JSON.stringify(body), {
-		headers: {
-			"Content-Type": "application/json",
-			...CORS_HEADERS,
-		},
-	});
-}
-
-/**
- * RFC 8414 — OAuth Authorization Server Metadata.
- * Describes the Better Auth authority so MCP clients know where to
- * authorize, exchange tokens, and register dynamic clients.
- */
-function handleOAuthAuthorizationServer(origin: string): Response {
-	const issuer = `${origin}/api/auth`;
-	return jsonResponse({
-		issuer,
-		authorization_endpoint: `${issuer}/mcp/authorize`,
-		token_endpoint: `${issuer}/mcp/token`,
-		registration_endpoint: `${issuer}/mcp/register`,
-		response_types_supported: ["code"],
-		grant_types_supported: ["authorization_code"],
-		token_endpoint_auth_methods_supported: ["client_secret_post"],
-		code_challenge_methods_supported: ["S256"],
-		scopes_supported: ["openid", "profile", "email", "offline_access"],
-	});
-}
-
-/**
- * RFC 9728 — OAuth Protected Resource Metadata.
- * Describes the MCP server endpoint and points clients to the
- * authorization server they need to obtain tokens from.
- */
-function handleOAuthProtectedResource(origin: string): Response {
-	return jsonResponse({
-		resource: `${origin}/api/mcp`,
-		authorization_servers: [`${origin}/api/auth`],
-		bearer_methods_supported: ["header"],
-	});
-}
 
 export type ServerEntry = { fetch: RequestHandler<Register> };
 
@@ -64,15 +21,21 @@ function createServerEntry(entry: ServerEntry): ServerEntry {
 			const url = new URL(request.url);
 
 			// Handle .well-known discovery endpoints before TanStack Start routing
-			if (url.pathname === "/.well-known/oauth-authorization-server") {
+			if (
+				url.pathname === "/.well-known/oauth-authorization-server" ||
+				url.pathname === "/.well-known/oauth-authorization-server/api/auth"
+			) {
 				if (request.method === "OPTIONS") {
-					return new Response(null, { status: 204, headers: CORS_HEADERS });
+					return handleOAuthOptions();
 				}
 				return handleOAuthAuthorizationServer(url.origin);
 			}
-			if (url.pathname === "/.well-known/oauth-protected-resource") {
+			if (
+				url.pathname === "/.well-known/oauth-protected-resource" ||
+				url.pathname === "/.well-known/oauth-protected-resource/api/mcp"
+			) {
 				if (request.method === "OPTIONS") {
-					return new Response(null, { status: 204, headers: CORS_HEADERS });
+					return handleOAuthOptions();
 				}
 				return handleOAuthProtectedResource(url.origin);
 			}

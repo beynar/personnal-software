@@ -87,6 +87,7 @@ pnpm wrangler d1 migrations apply DB --local --config wrangler.jsonc
 ## 6. Start Local Development
 
 ```bash
+pnpm run doctor
 pnpm dev
 ```
 
@@ -104,7 +105,7 @@ Before deploying, verify:
 
 1. Open `http://localhost:3934` or the URL printed by `pnpm dev`.
 2. Confirm login/signup renders.
-3. Create a test account with the temporary signup password.
+3. Run `pnpm seed:dev` or create a test account with the temporary signup password.
 4. Confirm a default organization is created after signup/session success.
 5. Create another account with the same name and confirm organization slug suffixing works.
 6. Confirm login, signout, and active organization selection.
@@ -177,8 +178,9 @@ pnpm wrangler d1 migrations apply DB --remote --config wrangler.jsonc
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm run doctor:full
 pnpm wrangler deploy --dry-run --config dist/server/wrangler.json
-pnpm deploy
+pnpm run deploy
 ```
 
 ## Troubleshooting
@@ -187,3 +189,4 @@ pnpm deploy
 - If D1 queries fail locally, confirm local migrations were applied with `--local`.
 - If the deployed Worker boots but auth fails, confirm `SITE_URL` and `TRUSTED_ORIGINS` match the public origin.
 - If a route needs first-paint data, put it in the TanStack loader and return any dashboard header metadata from that loader.
+- If `pnpm run doctor` reports multiple `DB` bindings, Wrangler probably appended a second D1 stanza during `d1 create --update-config`; collapse the config back to one `DB` binding.

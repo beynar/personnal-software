@@ -5,7 +5,7 @@ import {
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-
+import type { ApiContext } from "~/lib/orpc/context";
 import { createApiContext } from "~/lib/orpc/context";
 import { apiRouter } from "~/lib/orpc/router";
 import { PROJECT_NAME } from "~/lib/project";
@@ -75,9 +75,12 @@ export function getOpenApiSpec(): Record<string, unknown> {
 	return openApiSpec as Record<string, unknown>;
 }
 
-export async function handleApiRequest(request: Request): Promise<Response> {
+export async function handleApiRequest(
+	request: Request,
+	context?: ApiContext,
+): Promise<Response> {
 	const result = await apiHandler.handle(request, {
-		context: await createApiContext(request),
+		context: context ?? (await createApiContext(request)),
 	});
 
 	if (!result.matched) {

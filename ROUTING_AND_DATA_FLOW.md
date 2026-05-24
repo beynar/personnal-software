@@ -19,6 +19,7 @@ If the feature should be usable by the UI, an LLM, or an external client, define
 - post-render updates: typed oRPC/React Query mutation with explicit revalidation
 - local presentation mechanics: React state
 - small server-only helper: `createServerFn`
+- route failures: shared states in `app/components/route-error-state.tsx`
 
 ## Golden Path
 
@@ -44,6 +45,7 @@ That path demonstrates:
 - call the capability from the route loader for first paint
 - return dashboard header metadata from the loader when needed
 - define a skeleton loading component
+- use the shared 404, forbidden, and server-error states unless domain recovery is required
 - keep route files focused on composition and local state
 - verify auth, ownership, and machine access
 

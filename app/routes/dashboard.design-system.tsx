@@ -27,6 +27,10 @@ import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { toast } from "sonner";
 import ExampleChatbot from "~/components/ai-elements/example-chatbot";
+import {
+	DashboardFooterLeftPortal,
+	DashboardFooterRightPortal,
+} from "~/components/dashboard/shell-portals";
 import { DataTable } from "~/components/data-table/data-table";
 import { MarkdownRenderer } from "~/components/markdown/markdown-renderer";
 import {
@@ -510,34 +514,64 @@ flowchart TD
 
 function DesignSystemPage() {
 	return (
-		<div className="space-y-6">
-			<PageIntro />
-			<div className="grid gap-4 xl:grid-cols-2">
-				<ActionsShowcase />
-				<FeedbackShowcase />
-				<FormShowcase />
-				<SelectionShowcase />
-				<OverlayShowcase />
-				<MenuShowcase />
-				<CommandShowcase />
-				<StructureShowcase />
-				<NavigationShowcase />
-				<CalendarShowcase />
-				<ChartShowcase />
-				<DiceInputsShowcase />
-				<DiceDataShowcase />
-				<DiceInteractionShowcase />
-				<DiceMediaShowcase />
-				<BannerShowcase />
-				<TimelineShowcase />
-				<TourShowcase />
-				<SidebarShowcase />
-				<DisplayShowcase />
-				<MarkdownShowcase />
-				<AiElementsShowcase />
-				<TypographyShowcase />
+		<>
+			<DashboardShellFooterExample />
+			<div className="space-y-6">
+				<PageIntro />
+				<div className="grid gap-4 xl:grid-cols-2">
+					<ShellShowcase />
+					<ActionsShowcase />
+					<FeedbackShowcase />
+					<FormShowcase />
+					<SelectionShowcase />
+					<OverlayShowcase />
+					<MenuShowcase />
+					<CommandShowcase />
+					<StructureShowcase />
+					<NavigationShowcase />
+					<CalendarShowcase />
+					<ChartShowcase />
+					<DiceInputsShowcase />
+					<DiceDataShowcase />
+					<DiceInteractionShowcase />
+					<DiceMediaShowcase />
+					<BannerShowcase />
+					<TimelineShowcase />
+					<TourShowcase />
+					<SidebarShowcase />
+					<DisplayShowcase />
+					<MarkdownShowcase />
+					<AiElementsShowcase />
+					<TypographyShowcase />
+				</div>
 			</div>
-		</div>
+		</>
+	);
+}
+
+function DashboardShellFooterExample() {
+	return (
+		<>
+			<DashboardFooterLeftPortal>
+				<div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+					<Badge className="shrink-0" variant="outline">
+						Shell footer
+					</Badge>
+					<span className="truncate">
+						This design-system page mounted the footer through page portals.
+					</span>
+				</div>
+			</DashboardFooterLeftPortal>
+			<DashboardFooterRightPortal>
+				<Button size="sm" variant="ghost">
+					Reset
+				</Button>
+				<Button size="sm">
+					<Check className="size-4" />
+					Save example
+				</Button>
+			</DashboardFooterRightPortal>
+		</>
 	);
 }
 
@@ -623,6 +657,49 @@ function ActionsShowcase() {
 						<ToggleGroupItem value="week">Week</ToggleGroupItem>
 						<ToggleGroupItem value="month">Month</ToggleGroupItem>
 					</ToggleGroup>
+				</div>
+			</div>
+		</ShowcaseCard>
+	);
+}
+
+function ShellShowcase() {
+	return (
+		<ShowcaseCard
+			className="border-border/70 xl:col-span-2"
+			description="Header and footer slots stay outside page scroll while the route content remains the only scrollable region."
+			title="Dashboard Shell"
+		>
+			<div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+				<div className="overflow-hidden rounded-xl border border-border/70 bg-muted/30">
+					<div className="flex h-10 items-center justify-between border-b border-border/70 bg-background px-3 text-xs text-muted-foreground">
+						<span>Header metadata</span>
+						<Badge variant="outline">actions portal</Badge>
+					</div>
+					<div className="flex h-28 items-center justify-center px-4 text-center text-sm text-muted-foreground">
+						Only this middle pane scrolls. The shell owns the persistent chrome.
+					</div>
+					<div className="grid h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-border/70 bg-background px-3 text-xs text-muted-foreground">
+						<span className="truncate">footer left portal</span>
+						<span>footer right portal</span>
+					</div>
+				</div>
+				<div className="space-y-3 text-sm text-muted-foreground">
+					<p>
+						The footer is not rendered by default. Mount
+						<code className="mx-1 rounded bg-muted px-1 py-0.5">
+							DashboardFooterLeftPortal
+						</code>
+						or
+						<code className="mx-1 rounded bg-muted px-1 py-0.5">
+							DashboardFooterRightPortal
+						</code>
+						from a dashboard page to reveal it.
+					</p>
+					<p>
+						This page mounts both slots now, so the real shell footer at the
+						bottom of the viewport is the live example.
+					</p>
 				</div>
 			</div>
 		</ShowcaseCard>

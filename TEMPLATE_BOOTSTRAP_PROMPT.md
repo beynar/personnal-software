@@ -111,15 +111,23 @@ Use `pnpm` for all package management in this template.
    pnpm wrangler secret put BETTER_AUTH_SECRET
    pnpm wrangler secret put SUPER_ADMIN_SIGNUP_PASSWORD
    ```
-10. Confirm the scaffold runs locally.
-11. Deploy the scaffold to Cloudflare right away by following the repository's documented deployment flow.
-12. Once deployed, immediately give the user:
+10. Run the bootstrap verifier:
+   ```bash
+   pnpm run doctor
+   ```
+11. Confirm the scaffold runs locally.
+12. Seed or verify the local development account:
+   ```bash
+   pnpm seed:dev
+   ```
+13. Deploy the scaffold to Cloudflare right away by following the repository's documented deployment flow.
+14. Once deployed, immediately give the user:
    - the deployed Cloudflare app URL
    - the Cloudflare D1 database name and id
    - the temporary `SUPER_ADMIN_SIGNUP_PASSWORD`
-13. Ask the user whether to create a new remote GitHub repository, after fetching the available GitHub user and organization owner choices.
-14. After that, use the `AskUserQuestion` tool to ask the user what they want built from the template.
-15. Implement the requested application on top of the template.
+15. Ask the user whether to create a new remote GitHub repository, after fetching the available GitHub user and organization owner choices.
+16. After that, use the `AskUserQuestion` tool to ask the user what they want built from the template.
+17. Implement the requested application on top of the template.
 
 ## Bootstrap-Specific Instruction
 
@@ -166,6 +174,8 @@ While implementing the requested application:
 - use SSR loaders as the primary source of page data
 - return dashboard header metadata from loaders when the shell needs a title, description, or back button
 - define loading components with skeletons for new pages
+- use shared route error states unless the route needs domain-specific recovery
+- use `app/lib/orpc/authorization.ts` helpers for server-side permission checks
 - keep D1 access server-only through repositories or services under `app/db/`
 
 ## Required Output Behavior
@@ -199,5 +209,6 @@ Run:
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm run doctor:full
 pnpm wrangler deploy --dry-run --config dist/server/wrangler.json
 ```

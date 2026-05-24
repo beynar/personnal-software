@@ -24,9 +24,15 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ApiKeyDrawer } from "~/components/api-keys/api-key-drawer";
+import {
+	DASHBOARD_HEADER_ACTIONS_PORTAL_ID,
+	DashboardShellFooterPortalTargets,
+	DashboardShellPortalProvider,
+} from "~/components/dashboard/shell-portals";
 import { DashboardSidebarCommandBar } from "~/components/dashboard/sidebar-command-bar";
 import { OrganizationSwitcher } from "~/components/organizations/organization-switcher";
 import { PendingInvitationsDrawer } from "~/components/organizations/pending-invitations-drawer";
+import { RouteErrorComponent } from "~/components/route-error-state";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
@@ -74,6 +80,7 @@ export const Route = createFileRoute("/dashboard")({
 			throw redirect({ to: "/" });
 		}
 	},
+	errorComponent: RouteErrorComponent,
 	staticData: {
 		dashboardHeader: {
 			description: "Authenticated application workspace",
@@ -166,65 +173,66 @@ function DashboardShell() {
 	}
 
 	return (
-		<SidebarProvider className="h-screen overflow-hidden">
-			<Sidebar>
-				<SidebarHeader className="h-14 p-0">
-					<DashboardSidebarOrganizationSwitcher />
-				</SidebarHeader>
-				<SidebarContent>
-					<SidebarMenu>
-						{dashboardLinks.map((link) => (
-							<DashboardSidebarLink
-								isActive={isActiveLink(pathname, link.to)}
-								key={link.to}
-								link={link}
-							/>
-						))}
-					</SidebarMenu>
-				</SidebarContent>
-				<DashboardSidebarFooter
-					onCopyMcpUrl={handleCopyMcpUrl}
-					onSignOut={handleSignOut}
-					onThemeChange={applyTheme}
-					theme={theme}
-					user={user}
-				/>
-			</Sidebar>
-			<SidebarInset className="h-screen min-h-0 overflow-hidden">
-				<header className="sticky top-0 z-10 h-14 shrink-0 border-b border-border/70 bg-background/95 backdrop-blur">
-					<div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6">
-						<div className="flex items-center gap-2">
-							<SidebarTrigger />
-							{pageHeader?.backHref ? (
-								<Button asChild size="icon-sm" type="button" variant="ghost">
-									<Link to={pageHeader.backHref} viewTransition>
-										<ArrowLeft className="size-4" />
-										<span className="sr-only">Retour</span>
-									</Link>
-								</Button>
-							) : null}
-							<div className="min-w-0 leading-tight">
-								<p className="font-medium text-[0.8125rem] text-foreground leading-tight">
-									{pageHeader?.title}
-								</p>
-								<p className="truncate text-[0.6875rem] text-muted-foreground leading-tight">
-									{pageHeader?.description}
-								</p>
+		<DashboardShellPortalProvider>
+			<SidebarProvider className="fixed inset-0 overflow-hidden">
+				<Sidebar>
+					<SidebarHeader className="h-14 p-0">
+						<DashboardSidebarOrganizationSwitcher />
+					</SidebarHeader>
+					<SidebarContent>
+						<SidebarMenu>
+							{dashboardLinks.map((link) => (
+								<DashboardSidebarLink
+									isActive={isActiveLink(pathname, link.to)}
+									key={link.to}
+									link={link}
+								/>
+							))}
+						</SidebarMenu>
+					</SidebarContent>
+					<DashboardSidebarFooter
+						onCopyMcpUrl={handleCopyMcpUrl}
+						onSignOut={handleSignOut}
+						onThemeChange={applyTheme}
+						theme={theme}
+						user={user}
+					/>
+				</Sidebar>
+				<SidebarInset className="h-screen min-h-0 overflow-hidden">
+					<header className="sticky top-0 z-10 h-14 shrink-0 border-b border-border/70 bg-background/95 backdrop-blur">
+						<div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6">
+							<div className="flex items-center gap-2">
+								<SidebarTrigger />
+								{pageHeader?.backHref ? (
+									<Button asChild size="icon-sm" type="button" variant="ghost">
+										<Link to={pageHeader.backHref} viewTransition>
+											<ArrowLeft className="size-4" />
+											<span className="sr-only">Retour</span>
+										</Link>
+									</Button>
+								) : null}
+								<div className="min-w-0 leading-tight">
+									<p className="font-medium text-[0.8125rem] text-foreground leading-tight">
+										{pageHeader?.title}
+									</p>
+									<p className="truncate text-[0.6875rem] text-muted-foreground leading-tight">
+										{pageHeader?.description}
+									</p>
+								</div>
 							</div>
+							<div
+								className="flex shrink-0 items-center gap-2"
+								id={DASHBOARD_HEADER_ACTIONS_PORTAL_ID}
+							/>
 						</div>
-						<div
-							className="flex shrink-0 items-center gap-2"
-							id="dashboard-header-actions"
-						>
-							<DashboardHeaderActions pathname={pathname} />
-						</div>
+					</header>
+					<div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-6 [view-transition-name:dashboard-content] sm:px-6">
+						<Outlet />
 					</div>
-				</header>
-				<div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col overflow-y-auto px-4 py-6 [view-transition-name:dashboard-content] sm:px-6">
-					<Outlet />
-				</div>
-			</SidebarInset>
-		</SidebarProvider>
+					<DashboardShellFooterPortalTargets />
+				</SidebarInset>
+			</SidebarProvider>
+		</DashboardShellPortalProvider>
 	);
 }
 
@@ -259,10 +267,6 @@ function DashboardSidebarLink({
 			)}
 		</SidebarMenuItem>
 	);
-}
-
-function DashboardHeaderActions({ pathname: _pathname }: { pathname: string }) {
-	return null;
 }
 
 function DashboardSidebarOrganizationSwitcher() {

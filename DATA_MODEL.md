@@ -49,6 +49,7 @@ Rules:
 
 - derive the current user from Better Auth server-side
 - derive active organization from the session or the membership table
+- use `app/lib/orpc/authorization.ts` helpers before tenant-scoped reads or writes
 - check organization ownership before reads, writes, deletes, and exports
 - reject unauthorized writes with an error
 

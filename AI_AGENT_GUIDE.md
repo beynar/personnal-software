@@ -39,6 +39,8 @@ Do not bypass these layers. If a feature has persistence or ownership, route fil
 - Use oRPC for real feature capabilities.
 - Use generated OpenAPI and MCP from the oRPC surface.
 - Use Cloudflare primitives deliberately: D1 for relational data, R2 for blobs, Durable Objects for stateful coordination, Queues for async work.
+- Use `pnpm run doctor` and `pnpm run doctor:full` to verify bootstrap health.
+- Use `pnpm seed:dev` for the local test account instead of raw database inserts.
 
 ## Bootstrap A New App
 
@@ -74,8 +76,10 @@ pnpm wrangler d1 migrations apply DB --remote --config wrangler.jsonc
 ```
 
 9. Set Worker secrets with `pnpm wrangler secret put`.
-10. Deploy the scaffold before asking what to build.
-11. Ask whether to create a new GitHub remote only after deployment details are known.
+10. Run `pnpm run doctor`.
+11. Run `pnpm seed:dev` against the local app after `pnpm dev` is running.
+12. Deploy the scaffold before asking what to build.
+13. Ask whether to create a new GitHub remote only after deployment details are known.
 
 Never push a bootstrapped app back to the template repository.
 
@@ -134,15 +138,18 @@ function ExampleSkeleton() {
 
 If the page should appear in navigation, add it to `dashboardLinks` in `app/routes/dashboard.tsx`.
 
+Use the shared 404, forbidden, and server-error states from `app/components/route-error-state.tsx` unless the route has a domain-specific recovery action.
+
 ## Add A Feature Capability
 
 Use this path when the feature should be available to the UI, REST clients, MCP tools, or future agents.
 
 1. Define input/output schemas and route shape in `app/lib/orpc/contract.ts`.
 2. Implement the handler in `app/lib/orpc/router.ts`.
-3. Put database reads/writes and ownership checks in `app/db/<feature>.ts`.
-4. Call the capability from route loaders with `context.getOrpc()`.
-5. Use a typed client mutation after hydration and explicitly revalidate.
+3. Require identity or membership with `app/lib/orpc/authorization.ts`.
+4. Put database reads/writes and ownership checks in `app/db/<feature>.ts`.
+5. Call the capability from route loaders with `context.getOrpc()`.
+6. Use a typed client mutation after hydration and explicitly revalidate.
 
 Do not add hand-written REST handlers for feature capabilities. `/api/v1/*` is generated from oRPC.
 
@@ -180,7 +187,9 @@ Use Better Auth as the identity source.
 Server-side code should:
 
 - derive the current user from the Better Auth session or API key session
+- support MCP OAuth sessions through the authenticated oRPC context
 - derive active organization from the session or membership tables
+- use `requireAuthenticatedActor`, `requireActiveOrganizationMembership`, or `requireOrganizationMembership` from `app/lib/orpc/authorization.ts`
 - enforce membership in repositories/services
 - reject unauthorized access with an error
 
@@ -256,6 +265,8 @@ Run:
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm run doctor
+pnpm run doctor:full
 pnpm wrangler deploy --dry-run --config dist/server/wrangler.json
 ```
 

@@ -10,6 +10,7 @@ import {
 	searchCatalog,
 	searchPublicCatalog,
 } from "~/lib/openapi-catalog";
+import type { ApiContext } from "~/lib/orpc/context";
 import { PROJECT_NAME } from "~/lib/project";
 import type { McpSession } from "~/lib/rest-auth";
 
@@ -17,10 +18,6 @@ export const MCP_SERVER_INFO = {
 	name: PROJECT_NAME,
 	version: "1.0.0",
 } as const;
-
-type RestAuthContext = {
-	headers: Record<string, string>;
-};
 
 type PathParamValue = string | number | boolean;
 type QueryParamValue =
@@ -108,15 +105,6 @@ function requireSession(authInfo?: AuthInfo): McpSession {
 	return session as McpSession;
 }
 
-function requireRestAuth(authInfo?: AuthInfo): RestAuthContext {
-	const restAuth = authInfo?.extra?.restAuth;
-	if (!restAuth || typeof restAuth !== "object" || !("headers" in restAuth)) {
-		throw new Error("Missing REST auth context for MCP execution");
-	}
-
-	return restAuth as RestAuthContext;
-}
-
 function filterHeaders(responseHeaders: Headers): Record<string, string> {
 	const filtered: Record<string, string> = {};
 	for (const [key, value] of responseHeaders.entries()) {
@@ -145,15 +133,40 @@ function getExecutableRoute(
 	);
 }
 
-function buildForwardedHeaders(
-	authInfo?: AuthInfo,
+function buildInternalRequestHeaders(
 	inputHeaders?: Record<string, string>,
 ): Headers {
-	const headers = new Headers(requireRestAuth(authInfo).headers);
+	const headers = new Headers();
 	for (const [key, value] of Object.entries(inputHeaders ?? {})) {
+		if (isAuthHeader(key)) {
+			continue;
+		}
 		headers.set(key, value);
 	}
 	return headers;
+}
+
+function isAuthHeader(headerName: string): boolean {
+	const normalized = headerName.toLowerCase();
+	return (
+		normalized === "authorization" ||
+		normalized === "x-api-key" ||
+		normalized === "cookie"
+	);
+}
+
+function createMcpApiContext(
+	request: Request,
+	session: McpSession,
+): ApiContext {
+	return {
+		request,
+		auth: {
+			kind: "mcp-session",
+			user: null,
+			session,
+		},
+	};
 }
 
 function materializeRoutePath(
@@ -215,6 +228,7 @@ async function executeApiRoute(
 	input: ExecuteInput,
 	authInfo?: AuthInfo,
 ): Promise<ResponseEnvelope> {
+	const session = requireSession(authInfo);
 	const method = (input.method ?? "GET").toUpperCase();
 	const path = input.path ?? "/";
 	const normalizedTemplatePath = normalizeApiRoutePath(path);
@@ -227,7 +241,7 @@ async function executeApiRoute(
 	const resolvedPath = materializeRoutePath(route.path, input.params);
 	const requestPath = appendQueryString(resolvedPath, input.query);
 
-	const headers = buildForwardedHeaders(authInfo, input.headers);
+	const headers = buildInternalRequestHeaders(input.headers);
 	let body: BodyInit | undefined;
 	if (input.body !== undefined && method !== "GET" && method !== "HEAD") {
 		if (!headers.has("content-type")) {
@@ -241,7 +255,10 @@ async function executeApiRoute(
 
 	const requestInit: RequestInit = { method, headers, body };
 	const request = new Request(`http://localhost${requestPath}`, requestInit);
-	const response = await handleApiRequest(request);
+	const response = await handleApiRequest(
+		request,
+		createMcpApiContext(request, session),
+	);
 	const rawBody = await response.arrayBuffer();
 	const truncated = rawBody.byteLength > MAX_BODY_BYTES;
 	const bodySlice = truncated ? rawBody.slice(0, MAX_BODY_BYTES) : rawBody;

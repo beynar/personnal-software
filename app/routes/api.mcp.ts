@@ -9,7 +9,7 @@ import {
 } from "~/lib/api-auth";
 import { auth } from "~/lib/auth";
 import { createAuthInfo, MCP_SERVER_INFO, registerMcpTools } from "~/lib/mcp";
-import { createRestAuthHeaders, type McpSession } from "~/lib/rest-auth";
+import type { McpSession } from "~/lib/rest-auth";
 
 const CORS_HEADERS = {
 	"Access-Control-Allow-Origin": "*",
@@ -101,15 +101,7 @@ async function handleAuthenticatedMcpRequest(
 		await server.connect(transport);
 		return withCors(
 			await transport.handleRequest(request, {
-				authInfo: {
-					...createAuthInfo(session),
-					extra: {
-						session,
-						restAuth: {
-							headers: createRestAuthHeaders(request.headers),
-						},
-					},
-				},
+				authInfo: createAuthInfo(session),
 			}),
 		);
 	} finally {

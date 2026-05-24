@@ -36,6 +36,8 @@ pnpm wrangler d1 create <app-slug> --binding DB --update-config --config wrangle
 pnpm dlx auth@latest generate --config app/lib/auth-server.ts --output app/db/auth.schema.ts --yes
 pnpm drizzle-kit generate
 pnpm wrangler d1 migrations apply DB --local --config wrangler.jsonc
+pnpm run doctor
+pnpm seed:dev
 pnpm dev
 ```
 
@@ -60,7 +62,7 @@ pnpm wrangler secret put BETTER_AUTH_SECRET
 pnpm wrangler secret put SUPER_ADMIN_SIGNUP_PASSWORD
 pnpm build
 pnpm wrangler deploy --dry-run --config dist/server/wrangler.json
-pnpm deploy
+pnpm run deploy
 ```
 
 Do not store secrets in `wrangler.jsonc`.
@@ -104,6 +106,21 @@ The app exposes:
 - `/api/auth/*` for Better Auth
 
 REST and MCP can authenticate with Better Auth API keys. MCP OAuth metadata is served from the app origin.
+
+## Starter Utilities
+
+- `pnpm run doctor` verifies local bootstrap configuration without mutating files or data.
+- `pnpm run doctor:full` also probes the running local app, builds, and runs a Wrangler dry-run.
+- `pnpm seed:dev` creates or reuses `test@test.com` / `testtest` on a local app origin and ensures a default organization exists.
+
+The seed command refuses non-local origins unless `--allow-remote` is passed.
+
+## Starter Error And Auth Patterns
+
+- Shared route failures live in `app/components/route-error-state.tsx`.
+- Root and dashboard routes use the shared 404, forbidden, and server-error states by default.
+- Server-side permission helpers live in `app/lib/orpc/authorization.ts`.
+- Use `requireAuthenticatedActor`, `requireActiveOrganizationMembership`, or `requireOrganizationMembership` inside oRPC handlers and server repositories before reading tenant data.
 
 ## Verification
 

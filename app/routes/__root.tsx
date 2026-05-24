@@ -4,9 +4,12 @@ import {
 	Outlet,
 	Scripts,
 } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import type { ReactNode } from "react";
 import { NavigationProgress } from "~/components/navigation-progress";
+import {
+	NotFoundRouteState,
+	RouteErrorComponent,
+} from "~/components/route-error-state";
 import { Toaster } from "~/components/ui/sonner";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { PROJECT_NAME } from "~/lib/project";
@@ -18,6 +21,7 @@ const faviconHref = `data:image/svg+xml,${encodeURIComponent(
 )}`;
 
 export const Route = createRootRouteWithContext<AppRouterContext>()({
+	errorComponent: RouteErrorComponent,
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },
@@ -29,6 +33,7 @@ export const Route = createRootRouteWithContext<AppRouterContext>()({
 			{ rel: "icon", href: faviconHref },
 		],
 	}),
+	notFoundComponent: NotFoundRouteState,
 	component: RootComponent,
 });
 
@@ -57,7 +62,6 @@ function RootDocument({ children }: { children: ReactNode }) {
 					<NavigationProgress />
 					{children}
 					<Toaster richColors />
-					<TanStackRouterDevtools position="bottom-right" />
 					<Scripts />
 				</TooltipProvider>
 			</body>
