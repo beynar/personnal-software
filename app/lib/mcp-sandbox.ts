@@ -21,6 +21,20 @@ export interface ExecuteResult {
 	logs?: string[];
 }
 
+export type SandboxJsonValue =
+	| string
+	| number
+	| boolean
+	| null
+	| SandboxJsonValue[]
+	| { [key: string]: SandboxJsonValue };
+
+export type SandboxDictionary = Record<string, SandboxJsonValue>;
+
+export interface SandboxExecutionContext {
+	dictionary?: SandboxDictionary;
+}
+
 export type SandboxTool = (...args: unknown[]) => Promise<unknown>;
 
 export interface SandboxToolProvider {
@@ -37,13 +51,21 @@ interface McpSandboxExecutorOptions {
 }
 
 interface CodeExecutorEntrypoint extends Rpc.WorkerEntrypointBranded {
-	evaluate(dispatchers: Record<string, ToolDispatcher>): Promise<ExecuteResult>;
+	evaluate(
+		dispatchers: Record<string, ToolDispatcher>,
+		context?: SandboxExecutionContext,
+	): Promise<ExecuteResult>;
 }
 
 const EXECUTOR_MODULE = "executor.js";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const VALID_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
-const RESERVED_PROVIDER_NAMES = new Set(["__dispatchers", "__logs"]);
+const RESERVED_PROVIDER_NAMES = new Set([
+	"__context",
+	"__dispatchers",
+	"__logs",
+	"dictionary",
+]);
 
 const JS_RESERVED_WORDS = new Set([
 	"abstract",
@@ -230,8 +252,9 @@ function createExecutorModule(
 		'import { WorkerEntrypoint } from "cloudflare:workers";',
 		"",
 		"export default class CodeExecutor extends WorkerEntrypoint {",
-		"  async evaluate(__dispatchers = {}) {",
+		"  async evaluate(__dispatchers = {}, __context = {}) {",
 		"    const __logs = [];",
+		"    const dictionary = __context?.dictionary ?? {};",
 		'    console.log = (...a) => { __logs.push(a.map(String).join(" ")); };',
 		'    console.warn = (...a) => { __logs.push("[warn] " + a.map(String).join(" ")); };',
 		'    console.error = (...a) => { __logs.push("[error] " + a.map(String).join(" ")); };',
@@ -293,6 +316,7 @@ export class McpSandboxExecutor {
 	async execute(
 		code: string,
 		providers: SandboxToolProvider[],
+		context: SandboxExecutionContext = {},
 	): Promise<ExecuteResult> {
 		const providerError = validateProviders(providers);
 		if (providerError) {
@@ -315,7 +339,9 @@ export class McpSandboxExecutor {
 					globalOutbound: this.#globalOutbound,
 				}))
 				.getEntrypoint<CodeExecutorEntrypoint>()
-				.evaluate(dispatchers);
+				.evaluate(dispatchers, {
+					dictionary: context.dictionary ?? {},
+				});
 
 			if (!response || typeof response !== "object") {
 				return {

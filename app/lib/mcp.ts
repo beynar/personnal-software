@@ -3,7 +3,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod/v3";
 import { handleApiRequest } from "~/lib/api";
 import { normalizeMcpCode } from "~/lib/mcp-code";
-import { getExecutor } from "~/lib/mcp-sandbox";
+import { getExecutor, type SandboxDictionary } from "~/lib/mcp-sandbox";
+import {
+	codeInputSchema,
+	executeInputSchema,
+	getExecutionDictionary,
+} from "~/lib/mcp-tool-input";
 import {
 	buildCatalog,
 	type CatalogEntry,
@@ -90,10 +95,6 @@ const searchRoutesInputSchema = {
 		.describe(
 			"Search text. You may provide a single query or a comma-separated list of queries. Search matches route methods, paths, summaries, descriptions, tags, parameters, and schema summaries.",
 		),
-} satisfies Record<string, z.ZodTypeAny>;
-
-const codeInputSchema = {
-	code: z.string().describe("JavaScript code to normalize or execute."),
 } satisfies Record<string, z.ZodTypeAny>;
 
 function requireSession(authInfo?: AuthInfo): McpSession {
@@ -409,6 +410,7 @@ const api = __createApiProxy(__apiTree, []);
 
 async function executeSandboxedCode(
 	code: string,
+	dictionary: SandboxDictionary,
 	authInfo?: AuthInfo,
 ): Promise<{
 	result: unknown;
@@ -431,7 +433,9 @@ ${buildApiProxyPrelude()}
 	return await __userCode();
 }`;
 
-	const execution = await getExecutor().execute(wrappedCode, [provider]);
+	const execution = await getExecutor().execute(wrappedCode, [provider], {
+		dictionary,
+	});
 	if (execution.error) {
 		const logs =
 			execution.logs && execution.logs.length > 0
@@ -520,15 +524,20 @@ export function registerMcpTools(server: McpServer): void {
 		{
 			title: "Execute Code",
 			description:
-				'Execute JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox exposes an `api.*` proxy derived from executable OpenAPI routes. Use `search-routes` first to discover available routes and their input/output types, then call them with route-shaped code such as `await api.examples.exampleId.workflow.post({ params: { exampleId: "sample" }, query: { q: "widget", limit: 5, dryRun: true, channel: "email" }, body: { message: "hello", priority: "high" } })`. Parameterized path segments become plain parameter-name properties in the proxy. Route method calls accept an object with optional `params`, `query`, `headers`, and `body`. Code is normalized before execution, so fenced code blocks, expressions, top-level await, function declarations, and export defaults are accepted.',
-			inputSchema: codeInputSchema,
+				'Execute JavaScript inside a Cloudflare dynamic worker sandbox. The sandbox exposes an `api.*` proxy derived from executable OpenAPI routes and a `dictionary` object copied from this tool input. Use `search-routes` first to discover available routes and their input/output types. Put string-heavy or nested payloads in `dictionary`, then reference them from code, for example `code: "await api.examples.exampleId.workflow.post({ params: { exampleId: dictionary.exampleId }, body: dictionary.body })"` with `dictionary: { "exampleId": "sample", "body": { "message": "hello", "priority": "high" } }`. Route method calls accept an object with optional `params`, `query`, `headers`, and `body`. Parameterized path segments become plain parameter-name properties in the proxy. Code is normalized before execution, so fenced code blocks, expressions, top-level await, function declarations, and export defaults are accepted.',
+			inputSchema: executeInputSchema,
 		},
-		async ({ code }, extra) => {
+		async ({ code, dictionary }, extra) => {
 			if (typeof code !== "string") {
 				throw new Error("Missing code");
 			}
+			const executionDictionary = getExecutionDictionary(dictionary);
 			requireSession(extra.authInfo);
-			const execution = await executeSandboxedCode(code, extra.authInfo);
+			const execution = await executeSandboxedCode(
+				code,
+				executionDictionary,
+				extra.authInfo,
+			);
 			return {
 				content: [
 					{
